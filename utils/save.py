@@ -8,7 +8,8 @@ from matplotlib import pyplot as plt
 
 from config.version import EXPERIMENT_FOLDER, EXPERIMENT_NOTES
 
-CHECKPOINTS_DIR = f"{EXPERIMENT_FOLDER}/checkpoints"
+CHECKPOINTS_SUBDIR = "checkpoints"
+CHECKPOINTS_DIR = f"{EXPERIMENT_FOLDER}/{CHECKPOINTS_SUBDIR}"
 LOG_BUFFER_LIMIT = 15
 
 def create_save_dir():
@@ -18,7 +19,7 @@ def create_save_dir():
 
 def save_checkpoint(agent, episode):
     os.makedirs(CHECKPOINTS_DIR, exist_ok=True)
-    agent.save(f"{CHECKPOINTS_DIR}/ddpg_agent_episode_{episode+1}.pth")
+    agent.save(f"{CHECKPOINTS_DIR}/ddpg_agent_episode_{episode+1:04d}.pth")
 
 class CSVSaver:
     def __init__(self, filename):
@@ -51,6 +52,19 @@ def save_critic_loss(agent):
     plt.tight_layout()
 
     filename = f"{EXPERIMENT_FOLDER}/critic_loss_plot.png"
+    plt.savefig(filename)
+
+def save_actor_loss(agent):
+    plt.figure(figsize=(10, 6))
+    plt.plot(agent.actor_loss_history, label='Actor Loss')
+    plt.xlabel('Training Steps')
+    plt.ylabel('MSE Loss')
+    plt.title('Actor Loss over Training')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    filename = f"{EXPERIMENT_FOLDER}/actor_loss_plot.png"
     plt.savefig(filename)
 
 def save_rewards(rewards, avg_window=10):

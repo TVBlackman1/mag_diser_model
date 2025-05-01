@@ -115,6 +115,7 @@ def train():
 
     csv_log.close()
     save.save_critic_loss(agent)
+    save.save_actor_loss(agent)
     save.save_rewards(rewards_history)
     save.save_replay_buffer(replay_buffer_mean_history)
 

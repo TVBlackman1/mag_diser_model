@@ -40,6 +40,7 @@ class DDPGAgent:
         self.batch_size = batch_size
 
         self.critic_loss_history = []
+        self.actor_loss_history = []
         # Сети
         self.actor = Actor(obs_dim, action_dim).to(device)
         self.critic = Critic(obs_dim, action_dim).to(device)
@@ -97,6 +98,7 @@ class DDPGAgent:
 
         # Актор Loss
         actor_loss = -self.critic(states, self.actor(states)).mean()
+        self.actor_loss_history.append(actor_loss.item())
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()

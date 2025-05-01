@@ -6,7 +6,7 @@ from inference import get_last
 
 DEVICE = "cpu"
 
-NUM_EPISODES = 12
+NUM_EPISODES = 5000
 MAX_STEPS = 300
 
 def main():
@@ -24,10 +24,13 @@ def main():
 
     print(f"🚀 Loaded model from {model_path}\n")
 
+    successes = 0
+    stat = {}
     for ep in range(1, NUM_EPISODES + 1):
         obs, _ = env.reset()
         total_reward = 0
-        episode_details = get_details(env)
+
+        episode_details, turn = get_details(env)
 
         for step in range(MAX_STEPS):
             obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(DEVICE)
@@ -44,20 +47,33 @@ def main():
 
         result = '❌'
         if total_reward > 0.0:
-            result = '✅'
-        print(f"{result} Episode {ep}: Reward = {total_reward:.2f}, Steps = {step + 1}")
-        print(episode_details)
+            successes += 1
+            # result = '✅'
+        else:
+            if turn in stat:
+                stat[turn] += 1
+            else:
+                stat[turn] = 1
+            # print(f"{result} Episode {ep}: Reward = {total_reward:.2f}, Steps = {step + 1}")
+            # print(episode_details)
+
+    print(f"Result: {successes}/{NUM_EPISODES} ({successes/NUM_EPISODES:.2f}%)")
+    for turn in stat.keys():
+        count = stat[turn]
+        print(f"{turn}: {count}")
 
 def get_details(env: DroneEnv):
     drone_x = env.drone_pos[0]
     drone_y = env.drone_pos[1]
     target_x = env.target_pos[0]
     target_y = env.target_pos[1]
+
+    turn = direction_arrow(drone_x, drone_y, target_x, target_y)
     episode_details = f"\tDetails: " + \
                       f"drone [{drone_x:.2f}, {drone_y:.2f}]" + \
-                      f" {direction_arrow(drone_x, drone_y, target_x, target_y)} " + \
+                      f" {turn} " + \
                       f"target [{target_x:.2f}, {target_y:.2f}]"
-    return episode_details
+    return episode_details, turn
 
 
 def direction_arrow(x1, y1, x2, y2):

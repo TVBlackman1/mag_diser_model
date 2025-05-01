@@ -33,8 +33,11 @@ class DDPGAgent:
         tau=0.005,
         buffer_size=int(1e6),
         batch_size=256,
-        device="cpu"
+        device="cpu",
+        actor_update_period=5,
     ):
+        self.actor_update_period = actor_update_period
+        self.current_actor_update_index = 0
         self.device = device
         self.gamma = gamma
         self.tau = tau
@@ -103,13 +106,17 @@ class DDPGAgent:
         # Актор Loss
         actor_loss = -self.critic(states, self.actor(states)).mean()
         self.actor_loss_history.append(actor_loss.item())
-        self.actor_optimizer.zero_grad()
-        actor_loss.backward()
-        self.actor_optimizer.step()
 
-        # Обновляем таргетные сети (polyak-обновление)
-        self.soft_update(self.target_actor, self.actor)
-        self.soft_update(self.target_critic, self.critic)
+        self.current_actor_update_index += 1
+        if self.current_actor_update_index == self.actor_update_period:
+            self.current_actor_update_index = 0
+            self.actor_optimizer.zero_grad()
+            actor_loss.backward()
+            self.actor_optimizer.step()
+
+            # Обновляем таргетные сети (polyak-обновление)
+            self.soft_update(self.target_actor, self.actor)
+            self.soft_update(self.target_critic, self.critic)
 
     def soft_update(self, target_net, net):
         """Polyak обновление параметров"""

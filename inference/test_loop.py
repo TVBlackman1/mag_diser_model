@@ -27,7 +27,7 @@ def main():
     for ep in range(1, NUM_EPISODES + 1):
         obs, _ = env.reset()
         total_reward = 0
-        episode_defails = get_details(env)
+        episode_details = get_details(env)
 
         for step in range(MAX_STEPS):
             obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(DEVICE)
@@ -35,8 +35,8 @@ def main():
             with torch.no_grad():
                 action = agent.actor(obs_tensor).squeeze(0)
 
-            action_idx = map_action_to_direction(action)
-            obs, reward, terminated, truncated, _ = env.step(action_idx)
+            direction = map_action_to_direction(action)
+            obs, reward, terminated, truncated, _ = env.step(direction)
 
             total_reward += reward
             if terminated or truncated:
@@ -46,7 +46,7 @@ def main():
         if total_reward > 0.0:
             result = '✅'
         print(f"{result} Episode {ep}: Reward = {total_reward:.2f}, Steps = {step + 1}")
-        print(episode_defails)
+        print(episode_details)
 
 def get_details(env: DroneEnv):
     drone_x = env.drone_pos[0]

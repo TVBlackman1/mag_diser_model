@@ -45,12 +45,7 @@ class DroneEnv(gym.Env):
 
         return self._get_obs(), {}
 
-    def step(self, action):
-        directions = [
-            np.array([0, 1]), [0, -1], [-1, 0], [1, 0],
-            [-1, 1], [1, 1], [-1, -1], [1, -1]
-        ]
-        move = directions[action]
+    def step(self, move):
         move = move / np.linalg.norm(move)
 
         new_pos = self.drone_pos + move * self.drone_speed
@@ -94,8 +89,8 @@ class DroneEnv(gym.Env):
         distance = np.linalg.norm(direction_vector)
 
         if distance > 1e-5:  # чтобы избежать деления на ноль
-            cos_theta = direction_vector[0] / distance
-            sin_theta = direction_vector[1] / distance
+            cos_theta = direction_vector[1] / distance
+            sin_theta = direction_vector[0] / distance
             exist_flag = 1.0
             distance_normalized = np.clip(distance / self.max_distance, 0.0, 1.0)
         else:

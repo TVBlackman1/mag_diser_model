@@ -89,7 +89,6 @@ class ReplayBuffer:
             delta2 = reward - self.mean
             self.M2 += delta * delta2
             self.std = sqrt(self.M2 / (count - 1))
-
         else:
             count = len(self.memory) + 1
             delta = reward - self.mean
@@ -112,7 +111,6 @@ class ReplayBuffer:
         middle = [x for x in self.memory if bottom_boundary <= x[2] < top_boundary]
         bottom = [x for x in self.memory if x[2] < bottom_boundary]
         total_size = len(top) + len(middle) + len(bottom)
-        arr = [*top, *middle, *bottom]
 
         n_top = int(total_size * good_ratio)
         n_middle = int(total_size * middle_ratio)

@@ -14,12 +14,12 @@ DIRECTIONS = np.array([
 ])
 DIRECTIONS = DIRECTIONS / np.linalg.norm(DIRECTIONS, axis=1, keepdims=True)
 
-def map_action_to_direction(action):
+def map_action_to_direction(action) -> np.ndarray:
     """Преобразовать выход сети в ближайшее дискретное направление"""
     action = action.detach().cpu().numpy()
     similarities = DIRECTIONS @ action
     idx = np.argmax(similarities)
-    return idx
+    return DIRECTIONS[idx]
 
 class DDPGAgent:
     def __init__(
@@ -70,8 +70,8 @@ class DDPGAgent:
         action = torch.clamp(action + noise, -1, 1)
 
         # Маппинг на дискретные направления
-        action_idx = map_action_to_direction(action)
-        return action_idx
+        direction = map_action_to_direction(action)
+        return direction
 
     def update(self):
         """Обновление нейронок на основе батча из буфера"""

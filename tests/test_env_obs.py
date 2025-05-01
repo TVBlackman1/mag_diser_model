@@ -1,5 +1,5 @@
 # tests/test_env_obs.py
-
+from agents.ddpg_agent import DIRECTIONS
 from env.drone_env import DroneEnv
 import numpy as np
 
@@ -16,14 +16,15 @@ def main():
     print("---------------------------")
 
     for i in range(30):
-        action = env.action_space.sample()
-        obs, reward, terminated, truncated, info = env.step(action)
+        action_idx = env.action_space.sample()
+        direction = DIRECTIONS[action_idx]
+        obs, reward, terminated, truncated, info = env.step(direction)
 
         distance_normalized = obs[3]
         distance_history.append(distance_normalized)
 
         print(f"Step {i+1}")
-        print(f"Action: {action}")
+        print(f"Action: {direction}")
         print(f"cos(theta) = {obs[0]:.4f}, sin(theta) = {obs[1]:.4f}, exist_flag = {obs[2]}, normalized_distance = {obs[3]:.4f}")
         print(f"Reward: {reward:.2f}")
         print("---------------------------")

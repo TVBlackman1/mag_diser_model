@@ -14,7 +14,7 @@ def run_warmup_on_env(agent, steps=500):
         move_direction = DIRECTIONS[action_idx]
         action_tensor = torch.tensor(move_direction, dtype=torch.float32)
 
-        next_obs, reward, terminated, truncated, _ = env.step(action_idx)
+        next_obs, reward, terminated, truncated, _ = env.step(move_direction)
         done = terminated or truncated
 
         agent.replay_buffer.add(obs, action_tensor.numpy(), reward, next_obs, float(done))

@@ -64,14 +64,13 @@ def train():
                 noise_std = ACTION_NOISE_STD2
 
             time_logger.start("action")
-            action_idx = agent.select_action(obs, noise_std=noise_std)
+            move_direction = agent.select_action(obs, noise_std=noise_std)
             time_logger.stop("action")
 
-            move_direction = DIRECTIONS[action_idx]
             action_for_buffer = torch.tensor(move_direction, dtype=torch.float32).to(DEVICE)
 
             time_logger.start("env.step")
-            next_obs, reward, terminated, truncated, _ = env.step(action_idx)
+            next_obs, reward, terminated, truncated, _ = env.step(move_direction)
             time_logger.stop("env.step")
 
             done = terminated or truncated

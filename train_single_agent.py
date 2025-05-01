@@ -79,12 +79,12 @@ def train():
             agent.replay_buffer.add(obs, action_for_buffer.cpu().numpy(), reward, next_obs, float(done))
             time_logger.stop("replay_buffer.add")
 
-            replay_buffer_mean_history.append(agent.replay_buffer.mean)
 
             time_logger.start("agent.update")
             agent.update()
             time_logger.stop("agent.update")
 
+            replay_buffer_mean_history.append(agent.replay_buffer.get_stats())
 
             obs = next_obs
             total_reward += reward
@@ -117,6 +117,7 @@ def train():
     save.save_actor_loss(agent)
     save.save_rewards(rewards_history)
     save.save_replay_buffer(replay_buffer_mean_history)
+    save.plot_td_histogram(agent.replay_buffer.priorities)
 
 
 if __name__ == "__main__":

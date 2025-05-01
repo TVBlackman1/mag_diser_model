@@ -1,50 +1,7 @@
-# # utils/replay_buffer.py
-#
-# import random
-# import numpy as np
-# import torch
-#
-#
-# class ReplayBuffer:
-#     def __init__(self, buffer_size, batch_size, device):
-#         self.buffer_size = buffer_size
-#         self.batch_size = batch_size
-#         self.device = device
-#
-#         self.memory = []
-#         self.position = 0
-#
-#     def add(self, state, action, reward, next_state, done):
-#         """Добавить один переход в буфер"""
-#         if len(self.memory) < self.buffer_size:
-#             self.memory.append(None)
-#         self.memory[self.position] = (state, action, reward, next_state, done)
-#         self.position = (self.position + 1) % self.buffer_size
-#
-#     def sample(self):
-#         """Вернуть случайный батч для обучения"""
-#         batch = random.sample(self.memory, self.batch_size)
-#         states, actions, rewards, next_states, dones = map(np.array, zip(*batch))
-#
-#         return (
-#             torch.tensor(states, dtype=torch.float32).to(self.device),
-#             torch.tensor(actions, dtype=torch.float32).to(self.device),
-#             torch.tensor(rewards, dtype=torch.float32).unsqueeze(1).to(self.device),
-#             torch.tensor(next_states, dtype=torch.float32).to(self.device),
-#             torch.tensor(dones, dtype=torch.float32).unsqueeze(1).to(self.device)
-#         )
-#
-#     def __len__(self):
-#         return len(self.memory)
-
-# utils/replay_buffer.py
-
 import random
 import numpy as np
 import torch
 from math import sqrt
-
-TOP_K = 4500 # Число лучших переходов для приоритизированного сэмплирования
 
 
 class ReplayBuffer:
@@ -54,6 +11,7 @@ class ReplayBuffer:
         self.device = device
 
         self.memory = []
+        self.priorities = [] # TD-error priority
         self.mean = 0
         self.std = 0
         self.M2 = 0  # сумма квадратов отклонений для std по методу Welford'а
@@ -63,13 +21,13 @@ class ReplayBuffer:
 
     def add(self, state, action, reward, next_state, done):
         """Добавить один переход в буфер"""
-        # if len(self.memory) >= self.batch_size and reward < self.mean:
-        #     return
+
         if self.position == 0 and len(self.memory) != 0:
             self.is_first_turn = False
 
         if len(self.memory) < self.buffer_size:
             self.memory.append(None)
+            self.priorities.append(1.0) # max by default
 
         should_remove_from_mean = not self.is_first_turn
         if should_remove_from_mean:
@@ -105,23 +63,32 @@ class ReplayBuffer:
         bad_ratio = 0.2
         good_ratio = 0.6
 
-        bottom_boundary = self.mean - self.std
-        top_boundary = self.mean + self.std
-        top = [x for x in self.memory if x[2] >= top_boundary]
-        middle = [x for x in self.memory if bottom_boundary <= x[2] < top_boundary]
-        bottom = [x for x in self.memory if x[2] < bottom_boundary]
-        total_size = len(top) + len(middle) + len(bottom)
+        priorities_np = np.array(self.priorities)
+        mean = priorities_np.mean()
+        std = priorities_np.std()
+        bottom_boundary = mean - std
+        top_boundary = mean + std
 
-        n_top = int(total_size * good_ratio)
-        n_middle = int(total_size * middle_ratio)
-        n_bottom = int(total_size * bad_ratio)
+        # определяем группы индексов
+        high_idx = [i for i, p in enumerate(priorities_np) if p >= top_boundary]
+        mid_idx = [i for i, p in enumerate(priorities_np) if bottom_boundary <= p < top_boundary]
+        low_idx = [i for i, p in enumerate(priorities_np) if p < bottom_boundary]
 
-        batch = [
-            *random.sample(top, k=min(n_top, len(top))),
-            *random.sample(bottom, k=min(n_bottom, len(bottom))),
-            *random.sample(middle, k=min(n_middle, len(middle))),
-        ]
+        n_high = int(self.batch_size * good_ratio)
+        n_mid = int(self.batch_size * middle_ratio)
+        n_low = self.batch_size - n_high - n_mid
 
+        sampled_indices = (
+                random.sample(high_idx, min(n_high, len(high_idx))) +
+                random.sample(mid_idx, min(n_mid, len(mid_idx))) +
+                random.sample(low_idx, min(n_low, len(low_idx)))
+        )
+
+        # перемешиваем финальный набор индексов
+        random.shuffle(sampled_indices)
+
+        # формируем батч по этим индексам
+        batch = [self.memory[i] for i in sampled_indices]
         states, actions, rewards, next_states, dones = map(np.array, zip(*batch))
 
         return (
@@ -129,8 +96,13 @@ class ReplayBuffer:
             torch.tensor(actions, dtype=torch.float32).to(self.device),
             torch.tensor(rewards, dtype=torch.float32).unsqueeze(1).to(self.device),
             torch.tensor(next_states, dtype=torch.float32).to(self.device),
-            torch.tensor(dones, dtype=torch.float32).unsqueeze(1).to(self.device)
+            torch.tensor(dones, dtype=torch.float32).unsqueeze(1).to(self.device),
+            sampled_indices
         )
+
+    def update_priorities(self, indexes, priorities):
+        for idx, priority in zip(indexes, priorities):
+            self.priorities[idx] = priority
 
     def __len__(self):
         return len(self.memory)

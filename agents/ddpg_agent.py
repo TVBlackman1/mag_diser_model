@@ -5,6 +5,7 @@ import numpy as np
 
 from networks.actor import Actor
 from networks.critic import Critic
+from utils.per_replay_buffer import PERReplayBuffer
 from utils.replay_buffer import ReplayBuffer
 
 # 8 направлений (нормализованные)
@@ -58,7 +59,7 @@ class DDPGAgent:
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_lr)
 
         # Replay buffer
-        self.replay_buffer = ReplayBuffer(buffer_size, batch_size, device)
+        self.replay_buffer = PERReplayBuffer(buffer_size, batch_size, device)
 
     def select_action(self, obs, noise_std=0.1):
         """Выбираем действие на основе текущего состояния"""
@@ -78,7 +79,7 @@ class DDPGAgent:
         if len(self.replay_buffer) < self.batch_size:
             return
 
-        states, actions, rewards, next_states, dones = self.replay_buffer.sample()
+        states, actions, rewards, next_states, dones, indexes = self.replay_buffer.sample()
 
         # Прямой проход через таргетные сети для следующего состояния
         next_actions = self.target_actor(next_states)
@@ -87,6 +88,9 @@ class DDPGAgent:
 
         # Текущие Q-значения
         current_q = self.critic(states, actions)
+
+        td_errors = (current_q - target_q.detach()).abs().view(-1)
+        self.replay_buffer.update_priorities(indexes, td_errors.tolist())
 
         # Критик Loss
         critic_loss = nn.MSELoss()(current_q, target_q.detach())

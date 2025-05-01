@@ -86,16 +86,41 @@ def save_rewards(rewards, avg_window=10):
     filename = f"{EXPERIMENT_FOLDER}/rewards_plot.png"
     plt.savefig(filename)
 
-def save_replay_buffer(buffer: List):
-    plt.figure(figsize=(10, 6))
-    plt.plot(buffer, label='Replay buffer reward')
-    plt.xlabel('Training Steps')
-    plt.ylabel('Mean reward')
-    plt.title('Replay Buffer mean over Training')
-    plt.grid(True)
+def save_replay_buffer(stats: List):
+    means = [s["mean"] for s in stats]
+    maxs = [s["max"] for s in stats]
+    mins = [s["min"] for s in stats]
+    medians = [s["median"] for s in stats]
+
+    episodes = list(range(1, len(stats) + 1))
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(episodes, means, label="Mean TD", color="blue")
+    plt.plot(episodes, medians, label="Median TD", color="purple", linestyle="-.")
+    plt.plot(episodes, maxs, label="Max TD", color="red", linestyle="--")
+    plt.plot(episodes, mins, label="Min TD", color="green", linestyle="--")
+
+    plt.title("TD Priority Progression per Episode")
+    plt.xlabel("Episode")
+    plt.ylabel("Priority (TD Error)")
     plt.legend()
+    plt.grid(True)
     plt.tight_layout()
 
     filename = f"{EXPERIMENT_FOLDER}/replay_buffer_mean_reward_plot.png"
     plt.savefig(filename)
 
+
+def plot_td_histogram(td_errors, bins=50):
+    td_errors = np.array(td_errors)
+
+    plt.figure(figsize=(10, 5))
+    plt.hist(td_errors, bins=bins, color='skyblue', edgecolor='black')
+    plt.title("Histogram of Final TD Errors in Replay Buffer")
+    plt.xlabel("TD Error")
+    plt.ylabel("Count")
+    plt.grid(True)
+    plt.tight_layout()
+
+    filename = f"{EXPERIMENT_FOLDER}/replay_buffer_td_histogram_plot.png"
+    plt.savefig(filename)

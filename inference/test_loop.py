@@ -6,7 +6,7 @@ from inference import get_last
 
 DEVICE = "cpu"
 
-NUM_EPISODES = 100
+NUM_EPISODES = 12
 MAX_STEPS = 300
 
 def main():

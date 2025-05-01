@@ -1,10 +1,11 @@
 from datetime import datetime
 
-EXPERIMENT_TAG = "reward_buffer_ratio"
+EXPERIMENT_TAG = "added_log1p_td"
 EXPERIMENT_NOTES = '''
 — нормализованная награда по расстоянию
 — critic loss логируется
-— буфер возвращает процентную выборку в зависимости от mean, std
+— буфер возвращает процентную выборку в зависимости от critic loss, td
+- смягчение для td через log1p
 - warmup
 '''
 

@@ -23,7 +23,7 @@ def run_warmup_on_env(agent, steps=500):
     print(f"✅ Warm-up: {steps} transitions collected from one env.")
 
 
-def generate_warmup_experience(agent, num_envs=25, steps_per_env=500):
+def generate_warmup_experience(agent, num_envs=100, steps_per_env=200):
     """
     Создаёт num_envs сред (по одной за раз) и запускает warm-up на каждой.
     Все переходы направляются в один буфер агента.

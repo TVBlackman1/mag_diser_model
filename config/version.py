@@ -1,11 +1,10 @@
 from datetime import datetime
 
-EXPERIMENT_TAG = "reward_buffer_block"
+EXPERIMENT_TAG = "reward_buffer_ratio"
 EXPERIMENT_NOTES = '''
 — нормализованная награда по расстоянию
 — critic loss логируется
-— топ-400 приоритетизированных переходов
-— буфер имеет фильтр на reward по mean
+— буфер возвращает процентную выборку в зависимости от mean, std
 - warmup
 '''
 

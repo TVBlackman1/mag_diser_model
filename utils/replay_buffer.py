@@ -42,6 +42,7 @@
 import random
 import numpy as np
 import torch
+from math import sqrt
 
 TOP_K = 4500 # Число лучших переходов для приоритизированного сэмплирования
 
@@ -54,13 +55,16 @@ class ReplayBuffer:
 
         self.memory = []
         self.mean = 0
+        self.std = 0
+        self.M2 = 0  # сумма квадратов отклонений для std по методу Welford'а
+
         self.position = 0
         self.is_first_turn = True
 
     def add(self, state, action, reward, next_state, done):
         """Добавить один переход в буфер"""
-        if len(self.memory) >= self.batch_size and reward < self.mean:
-            return
+        # if len(self.memory) >= self.batch_size and reward < self.mean:
+        #     return
         if self.position == 0 and len(self.memory) != 0:
             self.is_first_turn = False
 
@@ -73,26 +77,52 @@ class ReplayBuffer:
             count = len(self.memory)
             count_after_removing = count - 1
             # removing
-            self.mean = (self.mean * len(self.memory) - for_remove) / count_after_removing
+            mean_before = self.mean
+            self.mean = (mean_before * len(self.memory) - for_remove) / count_after_removing
+            delta = for_remove - mean_before
+            self.M2 -= delta * (for_remove - self.mean)
+            self.std = sqrt(self.M2 / (count_after_removing - 1))
+
             # adding
-            self.mean = self.mean + (reward - self.mean) / count
+            delta = reward - self.mean
+            self.mean += delta / count
+            delta2 = reward - self.mean
+            self.M2 += delta * delta2
+            self.std = sqrt(self.M2 / (count - 1))
+
         else:
             count = len(self.memory) + 1
-            self.mean = self.mean + (reward - self.mean) / count
+            delta = reward - self.mean
+            self.mean += delta / count
+            delta2 = reward - self.mean
+            self.M2 += delta * delta2
+            self.std = sqrt(self.M2 / (count-1))
 
         self.memory[self.position] = (state, action, reward, next_state, done)
         self.position = (self.position + 1) % self.buffer_size
 
     def sample(self):
-        """Сэмплировать батч переходов из топ K лучших"""
-        # Сортируем память по reward
-        sorted_memory = sorted(self.memory, key=lambda x: x[2], reverse=True)
+        middle_ratio = 0.2
+        bad_ratio = 0.2
+        good_ratio = 0.6
 
-        # Берем только топ-K
-        top_memory = sorted_memory[:min(TOP_K, len(sorted_memory))]
+        bottom_boundary = self.mean - self.std
+        top_boundary = self.mean + self.std
+        top = [x for x in self.memory if x[2] >= top_boundary]
+        middle = [x for x in self.memory if bottom_boundary <= x[2] < top_boundary]
+        bottom = [x for x in self.memory if x[2] < bottom_boundary]
+        total_size = len(top) + len(middle) + len(bottom)
+        arr = [*top, *middle, *bottom]
 
-        # Выбираем случайный батч из топовых
-        batch = random.sample(top_memory, min(self.batch_size, len(top_memory)))
+        n_top = int(total_size * good_ratio)
+        n_middle = int(total_size * middle_ratio)
+        n_bottom = int(total_size * bad_ratio)
+
+        batch = [
+            *random.sample(top, k=min(n_top, len(top))),
+            *random.sample(bottom, k=min(n_bottom, len(bottom))),
+            *random.sample(middle, k=min(n_middle, len(middle))),
+        ]
 
         states, actions, rewards, next_states, dones = map(np.array, zip(*batch))
 

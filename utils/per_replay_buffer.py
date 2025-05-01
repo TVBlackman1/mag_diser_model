@@ -49,7 +49,8 @@ class PERReplayBuffer:
 
     def update_priorities(self, indices, td_errors):
         for i, td in zip(indices, td_errors):
-            self.priorities[i] = math.log1p(td)
+            reward = self.memory[i][2]
+            self.priorities[i] = math.log1p(td) * (1 if reward >= 0 else 0.1)
 
     def get_stats(self):
         tds = np.array(self.priorities)

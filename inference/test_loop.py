@@ -3,6 +3,7 @@ import torch
 from agents.ddpg_agent import DDPGAgent, map_action_to_direction
 from env.drone_env import DroneEnv
 from inference import get_last
+from inference.load_model import load_model
 
 DEVICE = "cpu"
 
@@ -11,18 +12,7 @@ MAX_STEPS = 300
 
 def main():
     model_path = get_last.get_latest_model_path()
-    env = DroneEnv()
-    obs_dim = env.observation_space.shape[0]
-    action_dim = 2  # [dx, dy] выход Actor-а
-
-    agent = DDPGAgent(obs_dim, action_dim, device=DEVICE)
-
-    # Загрузка весов
-    checkpoint = torch.load(model_path, map_location=DEVICE)
-    agent.actor.load_state_dict(checkpoint['actor'])
-    agent.actor.eval()
-
-    print(f"🚀 Loaded model from {model_path}\n")
+    env, agent = load_model()
 
     successes = 0
     stat = {}

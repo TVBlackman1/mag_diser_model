@@ -7,8 +7,8 @@ def generate_environment(field_size: float, num_obstacles: int) -> Dict[str, obj
     # print("generating environment")
     global retp
 
-    if retp != False:
-        return retp
+    # if retp != False:
+    #     return retp
 
     # print("??")
     fixed_distance = field_size / 2.2

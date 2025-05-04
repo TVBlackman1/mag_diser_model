@@ -1,51 +1,82 @@
-import asyncio
-
-import torch
-import websockets
+import socket
+import threading
 import json
+import torch
 import numpy as np
 
 from inference.load_model import load_model
 from config.env_config import FIELD_SIZE
+from utils.checks import is_target_reached, is_collision
 
 env, agent = load_model()
 
-async def handle_client(websocket):
-    print("Client connected.")
+HOST = "localhost"
+PORT = 12345
 
-    async for message in websocket:
-        data = json.loads(message)
-        command = data.get("command")
+def handle_client(conn):
+    print("🎮 Client connected.")
+    buffer = ""
+    while True:
+        try:
+            data = conn.recv(4096).decode()
+            if not data:
+                break
 
-        if command == "init_episode":
-            env.reset()
-            response = {
-                "field_size": FIELD_SIZE,
-                "drone": env.drone_pos.tolist(),
-                "target": env.target_pos.tolist(),
-                "obstacles": [obs.tolist() for obs in env.obstacles]
-            }
-            await websocket.send(json.dumps(response))
+            buffer += data
+            if not buffer.endswith("\n"):
+                continue  # Wait for end of full message
 
-        elif command == "step":
-            obs = np.array(data["observation"], dtype=np.float32)
-            with torch.no_grad():
-                action = agent.actor(torch.tensor(obs).unsqueeze(0)).squeeze(0).numpy()
-            dx, dy = action.tolist()
-            await websocket.send(json.dumps({"dx": dx, "dy": dy}))
+            request = json.loads(buffer.strip())
+            buffer = ""
 
-        elif command == "goal_reached":
-            print("✅ Target reached by drone.")
-            await websocket.send(json.dumps({"ack": "goal_received"}))
+            command = request.get("command")
 
-        else:
-            print("Unknown command:", command)
-            await websocket.send(json.dumps({"error": "Unknown command"}))
+            if command == "init_episode":
+                env.reset()
+                response = {
+                    "field_size": FIELD_SIZE,
+                    "drone": env.drone_pos.tolist(),
+                    "target": env.target_pos.tolist(),
+                    "obstacles": [obs.tolist() for obs in env.obstacles]
+                }
 
-async def main():
-    async with websockets.serve(handle_client, "localhost", 8765):
-        print("WebSocket server started on ws://localhost:8765")
-        await asyncio.Future()  # run forever
+            elif command == "step":
+                obs = np.array(request["observation"], dtype=np.float32)
+                with torch.no_grad():
+                    action = agent.actor(torch.tensor(obs).unsqueeze(0)).squeeze(0).numpy()
+                dx, dy = action.tolist()
+
+                response = {
+                    "dx": dx,
+                    "dy": dy,
+                    "drone_pos": env.drone_pos.tolist(),
+                    "goal_reached": bool(is_target_reached(env.drone_pos, env.target_pos)),
+                    "collision": bool(is_collision(env.drone_pos, env.obstacles))
+                }
+
+            else:
+                print("Unknown command:", command)
+                response = {"error": "Unknown command"}
+
+            conn.sendall((json.dumps(response) + "\n").encode())
+
+        except Exception as e:
+            print("💥 Connection error:", e)
+            break
+
+    conn.close()
+    print("🔌 Client disconnected.")
+
+def main():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((HOST, PORT))
+    server.listen(1)
+    print(f"🟢 TCP server listening on {HOST}:{PORT}")
+
+    while True:
+        conn, _ = server.accept()
+        thread = threading.Thread(target=handle_client, args=(conn,))
+        thread.start()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

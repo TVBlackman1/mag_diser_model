@@ -4,6 +4,7 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
+from utils.checks import is_target_reached
 from utils.generation import generate_environment
 from config.drone_config import DRONE_SPEED, DRONE_COLLISION_RADIUS
 from config.env_config import FIELD_SIZE, NUM_OBSTACLES, TARGET_RADIUS, DISTANCE_REWARD_MULTIPLIER, STEP_PENALTY_MULTIPLIER
@@ -52,7 +53,7 @@ class DroneEnv(gym.Env):
         new_pos = np.clip(new_pos, 0.0, self.field_size)
 
         hit_obstacle = any(np.linalg.norm(new_pos - np.array(obs)) < DRONE_COLLISION_RADIUS for obs in self.obstacles)
-        hit_target = np.linalg.norm(new_pos - self.target_pos) < TARGET_RADIUS
+        hit_target = is_target_reached(new_pos, self.target_pos)
 
         reward = 0.0
         terminated = False

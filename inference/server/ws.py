@@ -1,8 +1,8 @@
-import socket
-import threading
+import asyncio
 import json
-import torch
 import numpy as np
+import torch
+import websockets
 
 from inference.load_model import load_model
 from config.env_config import FIELD_SIZE
@@ -11,24 +11,13 @@ from utils.checks import is_target_reached, is_collision
 env, agent = load_model()
 
 HOST = "localhost"
-PORT = 12345
+PORT = 8765
 
-def handle_client(conn):
+async def handle_client(websocket):
     print("🎮 Client connected.")
-    buffer = ""
-    while True:
-        try:
-            data = conn.recv(4096).decode()
-            if not data:
-                break
-
-            buffer += data
-            if not buffer.endswith("\n"):
-                continue  # Wait for end of full message
-
-            request = json.loads(buffer.strip())
-            buffer = ""
-
+    try:
+        async for message in websocket:
+            request = json.loads(message)
             command = request.get("command")
 
             if command == "init_episode":
@@ -39,6 +28,7 @@ def handle_client(conn):
                     "target": env.target_pos.tolist(),
                     "obstacles": [obs.tolist() for obs in env.obstacles]
                 }
+                print("🆕 New episode initialized")
 
             elif command == "step":
                 obs = np.array(request["observation"], dtype=np.float32)
@@ -55,28 +45,22 @@ def handle_client(conn):
                 }
 
             else:
-                print("Unknown command:", command)
+                print("⚠️ Unknown command:", command)
                 response = {"error": "Unknown command"}
 
-            conn.sendall((json.dumps(response) + "\n").encode())
+            await websocket.send(json.dumps(response))
 
-        except Exception as e:
-            print("💥 Connection error:", e)
-            break
+    except websockets.ConnectionClosed:
+        print("🔌 Client disconnected (clean)")
+    except Exception as e:
+        print("💥 Connection error:", e)
+    finally:
+        print("📴 Session ended")
 
-    conn.close()
-    print("🔌 Client disconnected.")
-
-def main():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((HOST, PORT))
-    server.listen(1)
-    print(f"🟢 TCP server listening on {HOST}:{PORT}")
-
-    while True:
-        conn, _ = server.accept()
-        thread = threading.Thread(target=handle_client, args=(conn,))
-        thread.start()
+async def main():
+    async with websockets.serve(handle_client, HOST, PORT):
+        print(f"🟢 WebSocket server listening on ws://{HOST}:{PORT}")
+        await asyncio.Future()  # Run forever
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

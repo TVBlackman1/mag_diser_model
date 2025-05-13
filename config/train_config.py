@@ -1,6 +1,6 @@
 # Параметры обучения
-NUM_EPISODES = 300
-MAX_STEPS_PER_EPISODE = 500
+NUM_EPISODES = 500
+MAX_STEPS_PER_EPISODE = 300
 EVAL_INTERVAL = 50  # каждые 50 эпизодов сохраняем модель
 
 # Гиперпараметры агента
@@ -9,7 +9,7 @@ CRITIC_LR = 1e-3
 GAMMA = 0.99
 TAU = 0.005
 
-BUFFER_SIZE = int(1e6)
+BUFFER_SIZE = int(1500)
 BATCH_SIZE = 256
 
 # Noise (размах случайности для exploration)

@@ -1,41 +1,34 @@
-import socket
+import asyncio
 import json
+import pytest
+import websockets
 
 HOST = "localhost"
-PORT = 12345
+PORT = 8765
+WS_URL = f"ws://{HOST}:{PORT}"
 
-def send_json(sock, obj):
-    msg = json.dumps(obj) + "\n"
-    sock.sendall(msg.encode())
+async def send_and_receive(ws, obj):
+    await ws.send(json.dumps(obj))
+    response = await ws.recv()
+    return json.loads(response)
 
-def receive_json(sock, timeout=5.0):
-    sock.settimeout(timeout)
-    buffer = b""
-    while not buffer.endswith(b"\n"):
-        chunk = sock.recv(4096)
-        if not chunk:
-            raise ConnectionError("Server closed the connection")
-        buffer += chunk
-    return json.loads(buffer.decode())
-
-def test_init_episode():
-    with socket.create_connection((HOST, PORT), timeout=5) as sock:
-        send_json(sock, {"command": "init_episode"})
-        response = receive_json(sock)
+@pytest.mark.asyncio
+async def test_init_episode():
+    async with websockets.connect(WS_URL) as ws:
+        response = await send_and_receive(ws, {"command": "init_episode"})
 
         assert "field_size" in response
         assert "drone" in response
         assert "target" in response
         assert "obstacles" in response
 
-def test_step():
-    with socket.create_connection((HOST, PORT), timeout=5) as sock:
-        send_json(sock, {"command": "init_episode"})
-        _ = receive_json(sock)
+@pytest.mark.asyncio
+async def test_step():
+    async with websockets.connect(WS_URL) as ws:
+        await send_and_receive(ws, {"command": "init_episode"})
 
         obs = [0.0, 1.0, 1.0, 0.5]
-        send_json(sock, {"command": "step", "observation": obs})
-        response = receive_json(sock)
+        response = await send_and_receive(ws, {"command": "step", "observation": obs})
 
         assert "dx" in response
         assert "dy" in response

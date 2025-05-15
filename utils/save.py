@@ -6,6 +6,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from config.version import EXPERIMENT_FOLDER, EXPERIMENT_NOTES
+from env.drone_env import DroneEnv
 
 CHECKPOINTS_SUBDIR = "checkpoints"
 Q_SURFACE_SUBDIR = "q_surfaces"
@@ -126,8 +127,10 @@ def plot_td_histogram(td_errors, bins=50):
     filename = f"{EXPERIMENT_FOLDER}/replay_buffer_td_histogram_plot.png"
     plt.savefig(filename)
 
-def save_q_surface(critic, obs_tensor, episode, drone_pos=None, target_pos=None, obstacle_positions=None, resolution=50):
+def save_q_surface(critic, env: DroneEnv, episode, resolution=50, stride=4):
     os.makedirs(Q_SURFACE_DIR, exist_ok=True)
+
+    obs_tensor = torch.tensor(env.get_current_obs(), dtype=torch.float32).unsqueeze(0)
 
     dx = np.linspace(-1, 1, resolution)
     dy = np.linspace(-1, 1, resolution)
@@ -139,48 +142,88 @@ def save_q_surface(critic, obs_tensor, episode, drone_pos=None, target_pos=None,
             q_val = critic(obs_tensor, action).item()
             values[j, i] = q_val
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
 
-    # Q-функция
+    # --- Q-функция в пространстве действий
     im = ax1.imshow(values, extent=[-1, 1, -1, 1], origin='lower', cmap='viridis')
     fig.colorbar(im, ax=ax1, label='Q value')
     ax1.set_title("Q(s_fixed, a)")
     ax1.set_xlabel("dx")
     ax1.set_ylabel("dy")
 
-    # Пространство мира
+    # --- Мир (относительные координаты)
     ax2.set_title("World space (centered on drone)")
     ax2.set_aspect('equal')
     ax2.grid(True)
-
-    # Дрон — всегда в центре
     ax2.plot(0, 0, 'bo', label="Drone")
-
-    if drone_pos is None:
-        drone_pos = np.array([0.0, 0.0])
+    ax3.plot(0, 0, 'bo', label="Drone")
 
     max_dist = 1.0
-
-    # Цель
-    if target_pos is not None:
-        relative_target = np.array(target_pos) - drone_pos
+    if env.target_pos is not None:
+        relative_target = np.array(env.target_pos) - env.drone_pos
         ax2.plot(relative_target[0], relative_target[1], 'ro', label="Target")
-        max_dist = max(max_dist, np.linalg.norm(relative_target))
+        ax3.plot(relative_target[0], relative_target[1], 'ro', label="Target")
+        max_dist = max(max_dist, float(np.linalg.norm(relative_target)))
 
-    # Препятствия
-    if obstacle_positions:
-        for i, obs in enumerate(obstacle_positions):
-            rel_obs = np.array(obs) - drone_pos
+    if env.obstacles:
+        for i, obs in enumerate(env.obstacles):
+            rel_obs = np.array(obs) - env.drone_pos
             ax2.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
+            ax3.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
             max_dist = max(max_dist, np.linalg.norm(rel_obs))
 
-    # Установка динамического масштаба
     lim = max_dist * 1.2
     ax2.set_xlim(-lim, lim)
     ax2.set_ylim(-lim, lim)
     ax2.legend()
-    plt.tight_layout()
 
+    # --- Фазовый портрет (в каждой точке мира: куда идти)
+    ax3.set_title("Phase portrait in world space")
+    ax3.set_aspect('equal')
+    ax3.set_xlabel("x")
+    ax3.set_ylabel("y")
+    ax3.grid(True)
+
+    portrait_resolution = 24
+    world_grid = np.linspace(-lim, lim, portrait_resolution)
+    X, Y = np.meshgrid(world_grid, world_grid)
+    U = np.zeros_like(X)
+    V = np.zeros_like(Y)
+
+    action_dx = np.linspace(-1, 1, 8)
+    action_dy = np.linspace(-1, 1, 8)
+
+    for i in range(portrait_resolution):
+        for j in range(portrait_resolution):
+            pos = np.array([X[i, j], Y[i, j]]) + env.drone_pos
+            tmp_env = DroneEnv()
+            tmp_env.set_positions(pos, env.target_pos, env.obstacles)
+            obs = tmp_env.get_current_obs()
+            obs_tensor_local = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+
+            best_q = -float('inf')
+            best_a = (0.0, 0.0)
+
+            for dx_ in action_dx:
+                for dy_ in action_dy:
+                    a = torch.tensor([[dx_ , dy_]], dtype=torch.float32)
+                    q = critic(obs_tensor_local, a).item()
+                    if q > best_q:
+                        best_q = q
+                        best_a = (dx_, dy_)
+
+            norm = float(np.linalg.norm(best_a))
+            if norm > 1e-5:
+                U[i, j] = best_a[0] / norm
+                V[i, j] = best_a[1] / norm
+            else:
+                U[i, j] = 0.0
+                V[i, j] = 0.0
+
+    ax3.quiver(X, Y, U, V, color='black', scale=20, alpha=0.6)
+
+    # Сохраняем
+    plt.tight_layout()
     filename = f"{Q_SURFACE_DIR}/q_surface_{episode+1:04d}.png"
     plt.savefig(filename)
     plt.close()

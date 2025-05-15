@@ -29,10 +29,22 @@ def generate_environment(field_size: float, num_obstacles: int) -> Dict[str, obj
         target_pos = np.clip(drone_pos + np.array([fixed_distance, 0]), 0.0, field_size)
 
     # Генерируем препятствия
+    # Генерируем препятствия
     obstacles = [
         tuple(np.random.uniform(0.0, field_size, size=2))
-        for _ in range(num_obstacles)
+        for _ in range(num_obstacles - 1)
     ]
+
+    # Добавляем хотя бы одно препятствие между дроном и целью
+    if num_obstacles > 0:
+        alpha = np.random.uniform(0.3, 0.7)  # не строго по центру
+        between_point = drone_pos + alpha * (target_pos - drone_pos)
+
+        # Добавим небольшой шум, чтобы не быть строго на линии
+        noise = np.random.normal(scale=0.05 * field_size, size=2)
+        between_obstacle = tuple(np.clip(between_point + noise, 0.0, field_size))
+
+        obstacles.append(between_obstacle)
 
     retp = {
         "drone_pos": drone_pos,

@@ -62,15 +62,7 @@ def train():
         total_reward = 0
 
         if (episode + 1) % EVAL_INTERVAL == 0:
-            obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
-            save.save_q_surface(
-                critic=agent.critic,
-                obs_tensor=obs_tensor,
-                episode=episode,
-                drone_pos=env.drone_pos,
-                target_pos=env.target_pos,
-                obstacle_positions=env.obstacles
-            )
+            save.save_q_surface(critic=agent.critic, episode=episode, env=env)
         for step in range(MAX_STEPS_PER_EPISODE):
             noise_std = ACTION_NOISE_STD
             if step >= 200:

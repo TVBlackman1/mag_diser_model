@@ -6,9 +6,9 @@ import gymnasium as gym
 from gymnasium import spaces
 
 from utils.checks import is_target_reached
-from utils.generation import generate_environment, generate_environment_categorial
+from utils.generation import generate_environment_categorial
 from config.drone_config import DRONE_SPEED, DRONE_COLLISION_RADIUS
-from config.env_config import FIELD_SIZE, NUM_OBSTACLES, TARGET_RADIUS, DISTANCE_REWARD_MULTIPLIER, STEP_PENALTY_MULTIPLIER
+from config.env_config import FIELD_SIZE, NUM_OBSTACLES, DISTANCE_REWARD_MULTIPLIER, STEP_PENALTY_MULTIPLIER
 
 
 class DroneEnv(gym.Env):
@@ -36,6 +36,15 @@ class DroneEnv(gym.Env):
         )
 
         self.reset()
+
+    def set_positions(self, drone_pos, target_pos, obstacles):
+        self.num_obstacles = len(obstacles)
+        self.drone_pos = drone_pos
+        self.target_pos = target_pos
+        self.last_distance_to_target = np.linalg.norm(self.drone_pos - self.target_pos)
+
+    def get_current_obs(self):
+        return self._get_obs()
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)

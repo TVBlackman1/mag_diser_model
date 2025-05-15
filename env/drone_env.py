@@ -1,11 +1,12 @@
 # env/drone_env.py
+import typing
 
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
 from utils.checks import is_target_reached
-from utils.generation import generate_environment
+from utils.generation import generate_environment, generate_environment_categorial
 from config.drone_config import DRONE_SPEED, DRONE_COLLISION_RADIUS
 from config.env_config import FIELD_SIZE, NUM_OBSTACLES, TARGET_RADIUS, DISTANCE_REWARD_MULTIPLIER, STEP_PENALTY_MULTIPLIER
 
@@ -24,10 +25,13 @@ class DroneEnv(gym.Env):
         self.action_space = spaces.Discrete(8)
 
         # Наблюдения: [cos(angle), sin(angle), exist_flag, normalized_distance]
+        obs_count = 5
+        partical_obs_low = [-1.0, -1.0, 0.0, 0.0]
+        partical_obs_high = [1.0, 1.0, 1.0, 1.0]
         self.observation_space = spaces.Box(
-            low=np.array([-1.0, -1.0, 0.0, 0.0], dtype=np.float32),
-            high=np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32),
-            shape=(4,),
+            low=np.array(partical_obs_low*obs_count, dtype=np.float32),
+            high=np.array(partical_obs_high*obs_count, dtype=np.float32),
+            shape=(len(partical_obs_low)*obs_count,),
             dtype=np.float32
         )
 
@@ -36,11 +40,12 @@ class DroneEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
-        env_data = generate_environment(self.field_size, self.num_obstacles)
+        level = options['level_difficult'] if (options is not None) else 'easy'
+        env_data = generate_environment_categorial(self.field_size, level)
 
-        self.drone_pos = env_data["drone_pos"]
-        self.target_pos = env_data["target_pos"]
-        self.obstacles = env_data["obstacles"]
+        self.drone_pos : np.ndarray= env_data["drone_pos"]
+        self.target_pos : np.ndarray = env_data["target_pos"]
+        self.obstacles : typing.Tuple[np.ndarray] = env_data["obstacles"]
 
         self.last_distance_to_target = np.linalg.norm(self.drone_pos - self.target_pos)
 
@@ -59,7 +64,7 @@ class DroneEnv(gym.Env):
         terminated = False
 
         if hit_obstacle:
-            reward = -10
+            reward = -1000
             terminated = True
         elif hit_target:
             reward = 100
@@ -86,22 +91,36 @@ class DroneEnv(gym.Env):
         return obs, reward, terminated, False, {}
 
     def _get_obs(self):
-        direction_vector = self.target_pos - self.drone_pos
+        top = 4
+        parameters = 4
+        obstacles = sorted(self.obstacles, key=lambda _obs: np.linalg.norm(_obs - self.drone_pos))[:top]
+
+        fill_array = [0 for i in range((top+1) * parameters)]
+        self._get_partical_obs(self.target_pos, fill_array, 0)
+        for i, obs in enumerate(obstacles):
+            self._get_partical_obs(obs, fill_array, (i+1) * parameters)
+        obs = np.array(fill_array, dtype=np.float32)
+        return obs
+
+    def _get_partical_obs(self, object_pos, fill_np_array, start_index=0, exist=True):
+        direction_vector = object_pos - self.drone_pos
         distance = np.linalg.norm(direction_vector)
 
-        if distance > 1e-5:  # чтобы избежать деления на ноль
+        exist_flag = 1.0 if exist else 0.0
+
+        if not exist or distance > 1e-5:  # чтобы избежать деления на ноль
             cos_theta = direction_vector[1] / distance
             sin_theta = direction_vector[0] / distance
-            exist_flag = 1.0
             distance_normalized = np.clip(distance / self.max_distance, 0.0, 1.0)
         else:
             cos_theta = 0.0
             sin_theta = 0.0
-            exist_flag = 0.0
             distance_normalized = 0.0
 
-        obs = np.array([cos_theta, sin_theta, exist_flag, distance_normalized], dtype=np.float32)
-        return obs
+        fill_np_array[start_index] = cos_theta
+        fill_np_array[start_index+1] = sin_theta
+        fill_np_array[start_index+2] = exist_flag
+        fill_np_array[start_index+3] = distance_normalized
 
     def render(self):
         print(f"Drone position: {self.drone_pos}")

@@ -8,8 +8,12 @@ EXPERIMENT_NOTES = '''
 - смягчение для td через log1p
 - warmup
 - actor обновляется реже чем critic
+- теперь видит препятствия
 '''
+
+PROJECT_GLOBAL_STATE = "OBS"
+
 
 EXPERIMENT_DATE = datetime.now().strftime("%Y_%m_%d_%H%M")
 RESULTS_DIR = "results"
-EXPERIMENT_FOLDER = f"{RESULTS_DIR}/{EXPERIMENT_DATE}_{EXPERIMENT_TAG}"
+EXPERIMENT_FOLDER = f"{RESULTS_DIR}/{EXPERIMENT_DATE}_{PROJECT_GLOBAL_STATE}_{EXPERIMENT_TAG}"

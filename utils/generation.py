@@ -44,3 +44,18 @@ def generate_environment(field_size: float, num_obstacles: int) -> Dict[str, obj
         "target_pos": target_pos,
         "obstacles": obstacles
     }
+
+generation_difficult_levels = {
+    'easy': {
+        'num_obstacles': 0,
+    },
+    'medium': {
+        'num_obstacles': 3,
+    },
+    'hard': {
+        'num_obstacles': 10,
+    }
+}
+
+def generate_environment_categorial(field_size: float, level: str) -> Dict[str, object]:
+    return generate_environment(field_size, generation_difficult_levels[level]['num_obstacles'])

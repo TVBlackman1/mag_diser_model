@@ -1,6 +1,6 @@
 # Параметры обучения
-NUM_EPISODES = 500
-MAX_STEPS_PER_EPISODE = 300
+NUM_EPISODES = 800
+MAX_STEPS_PER_EPISODE = 150
 EVAL_INTERVAL = 50  # каждые 50 эпизодов сохраняем модель
 
 # Гиперпараметры агента

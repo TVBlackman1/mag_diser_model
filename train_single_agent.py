@@ -5,7 +5,6 @@ import torch
 import numpy as np
 from env.drone_env import DroneEnv
 from agents.ddpg_agent import DDPGAgent
-from agents.ddpg_agent import DIRECTIONS
 from utils import time_logger
 import random
 
@@ -21,7 +20,6 @@ from config.train_config import (
     BATCH_SIZE,
     ACTION_NOISE_STD,
     ACTION_NOISE_STD2,
-    ACTION_NOISE_STD3,
 )
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -52,12 +50,27 @@ def train():
     replay_buffer_mean_history = []
 
     for episode in range(NUM_EPISODES):
+        level_difficult = 'easy'
+        if episode / NUM_EPISODES >= 0.4:
+            level_difficult = 'medium'
+        # if episode / NUM_EPISODES >= 0.7:
+        #     level_difficult = 'hard'
         time_logger.start("env.reset")
-        obs, _ = env.reset()
+        obs, _ = env.reset(options={'level_difficult': level_difficult})
         time_logger.stop("env.reset")
         initial_distance = obs[3] * env.max_distance
         total_reward = 0
 
+        if (episode + 1) % EVAL_INTERVAL == 0:
+            obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+            save.save_q_surface(
+                critic=agent.critic,
+                obs_tensor=obs_tensor,
+                episode=episode,
+                drone_pos=env.drone_pos,
+                target_pos=env.target_pos,
+                obstacle_positions=env.obstacles
+            )
         for step in range(MAX_STEPS_PER_EPISODE):
             noise_std = ACTION_NOISE_STD
             if step >= 200:

@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from matplotlib import pyplot as plt
 
+from agents.ddpg_agent import DDPGAgent
 from config.version import EXPERIMENT_FOLDER, EXPERIMENT_NOTES
 from env.drone_env import DroneEnv
 
@@ -127,8 +128,11 @@ def plot_td_histogram(td_errors, bins=50):
     filename = f"{EXPERIMENT_FOLDER}/replay_buffer_td_histogram_plot.png"
     plt.savefig(filename)
 
-def save_q_surface(critic, env: DroneEnv, episode, resolution=50, stride=4):
+def save_q_surface(agent: DDPGAgent, env: DroneEnv, episode, resolution=50):
     os.makedirs(Q_SURFACE_DIR, exist_ok=True)
+
+    critic = agent.critic
+    actor = agent.actor
 
     obs_tensor = torch.tensor(env.get_current_obs(), dtype=torch.float32).unsqueeze(0)
 
@@ -142,7 +146,11 @@ def save_q_surface(critic, env: DroneEnv, episode, resolution=50, stride=4):
             q_val = critic(obs_tensor, action).item()
             values[j, i] = q_val
 
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
+    fig, axs = plt.subplots(2, 2, figsize=(18, 10))
+    ax1 = axs[0, 0]
+    ax2 = axs[0, 1]
+    ax3 = axs[1, 0]
+    ax4 = axs[1, 1]
 
     # --- Q-функция в пространстве действий
     im = ax1.imshow(values, extent=[-1, 1, -1, 1], origin='lower', cmap='viridis')
@@ -157,12 +165,14 @@ def save_q_surface(critic, env: DroneEnv, episode, resolution=50, stride=4):
     ax2.grid(True)
     ax2.plot(0, 0, 'bo', label="Drone")
     ax3.plot(0, 0, 'bo', label="Drone")
+    ax4.plot(0, 0, 'bo', label="Drone")
 
     max_dist = 1.0
     if env.target_pos is not None:
         relative_target = np.array(env.target_pos) - env.drone_pos
         ax2.plot(relative_target[0], relative_target[1], 'ro', label="Target")
         ax3.plot(relative_target[0], relative_target[1], 'ro', label="Target")
+        ax4.plot(relative_target[0], relative_target[1], 'ro', label="Target")
         max_dist = max(max_dist, float(np.linalg.norm(relative_target)))
 
     if env.obstacles:
@@ -170,6 +180,7 @@ def save_q_surface(critic, env: DroneEnv, episode, resolution=50, stride=4):
             rel_obs = np.array(obs) - env.drone_pos
             ax2.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
             ax3.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
+            ax4.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
             max_dist = max(max_dist, np.linalg.norm(rel_obs))
 
     lim = max_dist * 1.2
@@ -184,11 +195,20 @@ def save_q_surface(critic, env: DroneEnv, episode, resolution=50, stride=4):
     ax3.set_ylabel("y")
     ax3.grid(True)
 
+    # --- Фазовый портрет от актора
+    ax4.set_title("Actor Policy Field")
+    ax4.set_aspect('equal')
+    ax4.set_xlabel("x")
+    ax4.set_ylabel("y")
+    ax4.grid(True)
+
     portrait_resolution = 24
     world_grid = np.linspace(-lim, lim, portrait_resolution)
     X, Y = np.meshgrid(world_grid, world_grid)
-    U = np.zeros_like(X)
-    V = np.zeros_like(Y)
+    U_critic = np.zeros_like(X)
+    U_actor = np.zeros_like(X)
+    V_critic = np.zeros_like(Y)
+    V_actor = np.zeros_like(Y)
 
     action_dx = np.linspace(-1, 1, 8)
     action_dy = np.linspace(-1, 1, 8)
@@ -212,18 +232,25 @@ def save_q_surface(critic, env: DroneEnv, episode, resolution=50, stride=4):
                         best_q = q
                         best_a = (dx_, dy_)
 
-            norm = float(np.linalg.norm(best_a))
-            if norm > 1e-5:
-                U[i, j] = best_a[0] / norm
-                V[i, j] = best_a[1] / norm
-            else:
-                U[i, j] = 0.0
-                V[i, j] = 0.0
+            with torch.no_grad():
+                action = actor(obs_tensor_local).squeeze().numpy()
 
-    ax3.quiver(X, Y, U, V, color='black', scale=20, alpha=0.6)
+            U_critic[i, j], V_critic[i, j] = norm_vector(best_a)
+            U_actor[i, j], V_actor[i, j] = norm_vector(action)
+
+    ax3.quiver(X, Y, U_critic, V_critic, color='black', scale=20, alpha=0.6)
+    ax4.quiver(X, Y, U_actor, V_actor, color='darkgreen', scale=20, alpha=0.6)
+    ax4.set_xlim(-lim, lim)
+    ax4.set_ylim(-lim, lim)
 
     # Сохраняем
     plt.tight_layout()
     filename = f"{Q_SURFACE_DIR}/q_surface_{episode+1:04d}.png"
     plt.savefig(filename)
     plt.close()
+
+def norm_vector(vector):
+    norm = float(np.linalg.norm(vector))
+    if norm > 1e-5:
+       return vector[0] / norm, vector[1] / norm
+    return 0.0, 0.0

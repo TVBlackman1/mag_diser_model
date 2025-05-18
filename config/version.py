@@ -1,6 +1,6 @@
 from datetime import datetime
 
-EXPERIMENT_TAG = "actor_rare_update"
+EXPERIMENT_TAG = "obs_closing_penalty"
 EXPERIMENT_NOTES = '''
 — нормализованная награда по расстоянию
 — critic loss логируется
@@ -9,6 +9,7 @@ EXPERIMENT_NOTES = '''
 - warmup
 - actor обновляется реже чем critic
 - теперь видит препятствия
+- штраф за приближение к препятствию
 '''
 
 PROJECT_GLOBAL_STATE = "OBS"

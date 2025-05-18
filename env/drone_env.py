@@ -83,6 +83,13 @@ class DroneEnv(gym.Env):
             current_distance = np.linalg.norm(new_pos - self.target_pos)
             delta_distance = self.last_distance_to_target - current_distance
 
+            # за приближение к препятствию, нелинейность
+            obstacle_penalty = 0
+            for obs in self.obstacles:
+                dist = np.linalg.norm(new_pos - np.array(obs))
+                obstacle_penalty += -180.0 * np.exp(-dist / 0.3)
+            reward += obstacle_penalty
+
             # Бонус за приближение (относительно прошлой дистанции)
             if self.last_distance_to_target > 1e-5:
                 reward += (delta_distance / self.last_distance_to_target) * DISTANCE_REWARD_MULTIPLIER

@@ -11,7 +11,7 @@ def generate_environment(field_size: float, num_obstacles: int) -> Dict[str, obj
     #     return retp
 
     # print("??")
-    fixed_distance = field_size / 2.2
+    fixed_distance = field_size / np.random.uniform(1.3, 3.1)
 
     # Генерируем позицию дрона
     drone_pos = np.random.uniform(0.0, field_size, size=2)

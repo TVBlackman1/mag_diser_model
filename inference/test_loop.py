@@ -7,7 +7,7 @@ from inference.load_model import load_model
 
 DEVICE = "cpu"
 
-NUM_EPISODES = 300
+NUM_EPISODES = 3000
 MAX_STEPS = 300
 
 def main():

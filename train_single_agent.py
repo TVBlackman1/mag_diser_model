@@ -21,6 +21,8 @@ from config.train_config import (
     ACTION_NOISE_STD,
     ACTION_NOISE_STD2,
 )
+from utils.episode_saver import EpisodeSaver
+from utils.save import plot_episode_summary
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -61,11 +63,14 @@ def train():
         initial_distance = obs[3] * env.max_distance
         total_reward = 0
 
+        episode_saver = None
         if (episode + 1) % EVAL_INTERVAL == 0:
             save.save_q_surface(agent=agent, episode=episode, env=env)
+            episode_saver = EpisodeSaver(env)
+
         for step in range(MAX_STEPS_PER_EPISODE):
             noise_std = ACTION_NOISE_STD
-            if step >= 200:
+            if NUM_EPISODES / NUM_EPISODES >= 0.8:
                 noise_std = ACTION_NOISE_STD2
 
             time_logger.start("action")
@@ -75,7 +80,14 @@ def train():
             action_for_buffer = torch.tensor(move_direction, dtype=torch.float32).to(DEVICE)
 
             time_logger.start("env.step")
-            next_obs, reward, terminated, truncated, _ = env.step(move_direction)
+            next_obs, reward, terminated, truncated, details = env.step(move_direction)
+            if episode_saver is not None:
+                episode_saver.add_rewards(
+                    details['target_reward'],
+                    details['obstacle_penalty'],
+                    details['step_penalty']
+                )
+                episode_saver.add_drone_pos(env.drone_pos)
             time_logger.stop("env.step")
 
             done = terminated or truncated
@@ -115,6 +127,8 @@ def train():
             print(f"Episode {episode+1}, Average Reward: {avg_reward:.2f}")
 
         if (episode + 1) % EVAL_INTERVAL == 0:
+            if episode_saver is not None:
+                plot_episode_summary(episode=episode, saver=episode_saver)
             save.save_checkpoint(agent, episode)
 
     csv_log.close()

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-EXPERIMENT_TAG = "obs_closing_penalty"
+EXPERIMENT_TAG = "obs_closing_penalty_v2"
 EXPERIMENT_NOTES = '''
 — нормализованная награда по расстоянию
 — critic loss логируется
@@ -10,6 +10,7 @@ EXPERIMENT_NOTES = '''
 - actor обновляется реже чем critic
 - теперь видит препятствия
 - штраф за приближение к препятствию
+- штраф за именно приближение к препятствию, а не нахождение рядом с ним
 '''
 
 PROJECT_GLOBAL_STATE = "OBS"
@@ -18,3 +19,6 @@ PROJECT_GLOBAL_STATE = "OBS"
 EXPERIMENT_DATE = datetime.now().strftime("%Y_%m_%d_%H%M")
 RESULTS_DIR = "results"
 EXPERIMENT_FOLDER = f"{RESULTS_DIR}/{EXPERIMENT_DATE}_{PROJECT_GLOBAL_STATE}_{EXPERIMENT_TAG}"
+
+# добавить свертку в нейронку актора, добавить инфу о приближении к дрону, добавляющую очки за отъезд от препятствия
+# tanh в критике недооценивает недостатки

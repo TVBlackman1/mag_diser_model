@@ -2,12 +2,12 @@ import torch
 from env.drone_env import DroneEnv
 from agents.ddpg_agent import DIRECTIONS
 
-def run_warmup_on_env(agent, steps=500):
+def run_warmup_on_env(agent, steps=500, level='warmup'):
     """
     Выполняет warm-up: записывает N переходов из одной среды в буфер агента.
     """
     env = DroneEnv()
-    obs, _ = env.reset()
+    obs, _ = env.reset(options={'level_difficult': level})
 
     for _ in range(steps):
         action_idx = env.action_space.sample()
@@ -23,16 +23,21 @@ def run_warmup_on_env(agent, steps=500):
     print(f"✅ Warm-up: {steps} transitions collected from one env.")
 
 
-def generate_warmup_experience(agent, num_envs=50, steps_per_env=120):
+def generate_warmup_experience(agent, num_envs=80, steps_per_env=120):
     """
     Создаёт num_envs сред (по одной за раз) и запускает warm-up на каждой.
     Все переходы направляются в один буфер агента.
     """
     total_transitions = 0
 
-    for i in range(num_envs):
+    for i in range(num_envs//3*2):
         print(f"▶ Warm-up env {i}...")
-        run_warmup_on_env(agent, steps=steps_per_env)
+        run_warmup_on_env(agent, steps=steps_per_env, level='warmup')
+        total_transitions += steps_per_env
+
+    for i in range(num_envs//3*1):
+        print(f"▶ Warm-up env {i}...")
+        run_warmup_on_env(agent, steps=steps_per_env, level='warmup-obs')
         total_transitions += steps_per_env
 
     print(f"\n🏁 Warm-up complete: {total_transitions} transitions collected from {num_envs} environments.")

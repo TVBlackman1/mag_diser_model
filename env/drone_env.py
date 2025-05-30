@@ -5,7 +5,8 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
-from utils.checks import is_target_reached
+from utils.barrier import get_obs_force_field, get_target_force_field, get_target_force_near_field
+from utils.checks import is_target_reached, is_collision
 from utils.generation import generate_environment_categorial
 from config.drone_config import DRONE_SPEED, DRONE_COLLISION_RADIUS
 from config.env_config import FIELD_SIZE, NUM_OBSTACLES, DISTANCE_REWARD_MULTIPLIER, STEP_PENALTY_MULTIPLIER
@@ -61,50 +62,90 @@ class DroneEnv(gym.Env):
         return self._get_obs(), {}
 
     def step(self, move):
+        target_reward = 0.0
+        step_penalty = 0.0
+        obstacle_penalty = 0.0
+
+        # Нормализуем направление
         move = move / np.linalg.norm(move)
 
+        # Обновляем позицию дрона
         new_pos = self.drone_pos + move * self.drone_speed
-        new_pos = np.clip(new_pos, 0.0, self.field_size)
 
-        hit_obstacle = any(np.linalg.norm(new_pos - np.array(obs)) < DRONE_COLLISION_RADIUS for obs in self.obstacles)
+        # Проверка выхода за границы
+        out_of_bounds = np.any(new_pos < 0.0) or np.any(new_pos > self.field_size)
+        # new_pos = np.clip(new_pos, 0.0, self.field_size)
+
+        # Проверка на столкновение и достижение цели
+        hit_obstacle = is_collision(new_pos, self.obstacles)
         hit_target = is_target_reached(new_pos, self.target_pos)
 
         reward = 0.0
         terminated = False
 
+        # if out_of_bounds:
+        #     reward = -1000
+        #     terminated = True
+
         if hit_obstacle:
             reward = -1000
             terminated = True
+
         elif hit_target:
             reward = 100
             terminated = True
+
         else:
-            # Обычный ход — считаем динамическую награду
+            # --- Обычное движение ---
             current_distance = np.linalg.norm(new_pos - self.target_pos)
             delta_distance = self.last_distance_to_target - current_distance
 
-            # за приближение к препятствию, нелинейность
-            obstacle_penalty = 0
+            # --- Штраф за приближение к препятствиям ---
             for obs in self.obstacles:
-                dist = np.linalg.norm(new_pos - np.array(obs))
-                obstacle_penalty += -180.0 * np.exp(-dist / 0.3)
+                value, dir = get_obs_force_field(new_pos, obs)
+                alignment = np.dot(move, -dir)
+                if alignment < 0:
+                    value *= 0.1
+                obstacle_penalty += alignment * value
+                # dist = np.linalg.norm(new_pos - np.array(obs))
+                # obstacle_penalty += -300.0 * np.exp(-dist / 0.42)
+
+                # # Дополнительно штрафуем за движение в сторону препятствия
+                # if dist < 1.5:
+                #     dir_to_obs = (np.array(obs) - self.drone_pos) / (dist + 1e-6)
+                #
+                #     alignment = np.dot(move, dir_to_obs)
+                #     obstacle_penalty += alignment * np.exp(-dist / 0.5) * 400
+            # print(obstacle_penalty)
             reward += obstacle_penalty
 
-            # Бонус за приближение (относительно прошлой дистанции)
-            if self.last_distance_to_target > 1e-5:
-                reward += (delta_distance / self.last_distance_to_target) * DISTANCE_REWARD_MULTIPLIER
+            # --- Награда за прогресс ---
 
-            # Штраф за шаг пропорциональный расстоянию
-            step_penalty = - STEP_PENALTY_MULTIPLIER * (current_distance / self.max_distance)
+
+            if self.last_distance_to_target > 1e-5:
+                value, _ = get_target_force_near_field(new_pos, self.target_pos)
+                target_reward += value
+                alignment = np.dot(move, self.target_pos - new_pos)
+                if alignment > 0:
+                    target_reward += 2
+                # proximity_bonus = (delta_distance / self.last_distance_to_target)
+                # proximity_scale = np.exp(-current_distance / 1.2)  # усиливаем ближние шаги
+                # reward += proximity_bonus * proximity_scale * DISTANCE_REWARD_MULTIPLIER
+            reward += target_reward
+            # --- Штраф за шаг ---
+            step_penalty = -STEP_PENALTY_MULTIPLIER * (current_distance / self.max_distance)
+            # step_penalty = -1.0
             reward += step_penalty
 
-            # Обновляем дистанцию для следующего шага
+            # Обновляем дистанцию до цели
             self.last_distance_to_target = current_distance
-
         self.drone_pos = new_pos
-
         obs = self._get_obs()
-        return obs, reward, terminated, False, {}
+        return obs, reward, terminated, False, {
+            'target_reward': target_reward,
+            'step_penalty': step_penalty,
+            'obstacle_penalty': obstacle_penalty,
+        }
 
     def _get_obs(self):
         top = 4

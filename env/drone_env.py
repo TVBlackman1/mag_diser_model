@@ -69,6 +69,7 @@ class DroneEnv(gym.Env):
         target_reward = 0.0
         step_penalty = 0.0
         obstacle_penalty = 0.0
+        result = 'process'
 
         move = move.detach().numpy()
         move = move / np.linalg.norm(move)
@@ -93,10 +94,12 @@ class DroneEnv(gym.Env):
 
         if hit_obstacle:
             reward = -10000
+            result = 'fail'
             terminated = True
 
         elif hit_target:
             reward = 300
+            result = 'success'
             terminated = True
 
         else:
@@ -164,6 +167,7 @@ class DroneEnv(gym.Env):
             'target_reward': target_reward,
             'step_penalty': step_penalty,
             'obstacle_penalty': obstacle_penalty,
+            'result': result,
         }
 
     def _get_obs(self):

@@ -6,14 +6,7 @@ from config import version
 results_dir = version.RESULTS_DIR
 
 def get_latest_model_path():
-    if not os.path.exists(results_dir):
-        raise FileNotFoundError(f"Directory '{results_dir}' does not exist.")
-
-    subdirs = [d for d in os.listdir(results_dir) if os.path.isdir(os.path.join(results_dir, d))]
-    if not subdirs:
-        raise FileNotFoundError(f"No subdirectories found in '{results_dir}'.")
-
-    latest_dir = sorted(subdirs)[-1]
+    latest_dir = get_latest_result_path()
 
     checkpoints_dir = os.path.join(results_dir, latest_dir, utils.save.CHECKPOINTS_SUBDIR)
 
@@ -26,3 +19,14 @@ def get_latest_model_path():
     last_model_path = os.path.join(checkpoints_dir, last_model)
 
     return last_model_path
+
+def get_latest_result_path():
+    if not os.path.exists(results_dir):
+        raise FileNotFoundError(f"Directory '{results_dir}' does not exist.")
+
+    subdirs = [d for d in os.listdir(results_dir) if os.path.isdir(os.path.join(results_dir, d))]
+    if not subdirs:
+        raise FileNotFoundError(f"No subdirectories found in '{results_dir}'.")
+
+    latest_dir = sorted(subdirs)[-1]
+    return latest_dir

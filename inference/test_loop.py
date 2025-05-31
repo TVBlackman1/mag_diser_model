@@ -1,52 +1,44 @@
 import math
+import numpy as np
 import torch
-from agents.ddpg_agent import DDPGAgent
+
 from env.drone_env import DroneEnv
-from inference import get_last
 from inference.load_model import load_model
 
 DEVICE = "cpu"
 
-NUM_EPISODES = 3000
+NUM_EPISODES = 1000
 MAX_STEPS = 300
 
 def main():
-    model_path = get_last.get_latest_model_path()
     env, agent = load_model()
 
     successes = 0
+    fails = 0
     stat = {}
+    distance_percents = []
     for ep in range(1, NUM_EPISODES + 1):
-        obs, _ = env.reset()
-        total_reward = 0
-
-        episode_details, turn = get_details(env)
-
+        obs, _ = env.reset(options={'level_difficult': 'medium'})
+        start_distance = env.last_distance_to_target
         for step in range(MAX_STEPS):
             obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(DEVICE)
 
             with torch.no_grad():
                 action = agent.actor(obs_tensor).squeeze(0)
 
-            obs, reward, terminated, truncated, _ = env.step(action)
+            obs, reward, terminated, truncated, details = env.step(action)
 
-            total_reward += reward
             if terminated or truncated:
+                if details['result'] == 'success':
+                    successes += 1
+                if details['result'] == 'fail':
+                    fails += 1
                 break
-
-        result = '❌'
-        if total_reward > 0.0:
-            successes += 1
-            # result = '✅'
-        else:
-            if turn in stat:
-                stat[turn] += 1
-            else:
-                stat[turn] = 1
-            # print(f"{result} Episode {ep}: Reward = {total_reward:.2f}, Steps = {step + 1}")
-            # print(episode_details)
-
+        end_distance = env.last_distance_to_target
+        distance_percents.append(end_distance / start_distance)
     print(f"Result: {successes}/{NUM_EPISODES} ({successes/NUM_EPISODES:.2f}%)")
+    print(f"Fails: {fails}/{NUM_EPISODES} ({fails/NUM_EPISODES:.2f}%)")
+    ascii_histogram(distance_percents)
     for turn in stat.keys():
         count = stat[turn]
         print(f"{turn}: {count}")
@@ -89,6 +81,24 @@ def direction_arrow(x1, y1, x2, y2):
         return "↘"  # down-right
     else:
         return "→"  # right
+
+def ascii_histogram(values, bin_width=0.1, symbol="#", max_bar_width=50):
+    if len(values) == 0:
+        print("Empty input array.")
+        return
+
+    min_val = np.min(values)
+    max_val = np.max(values)
+    bins = np.arange(min_val, max_val + bin_width, bin_width)
+
+    counts, bin_edges = np.histogram(values, bins=bins)
+    max_count = counts.max()
+
+    print(f"Histogram (bin width = {bin_width}):\n")
+    for count, edge_start, edge_end in zip(counts, bin_edges[:-1], bin_edges[1:]):
+        bar_length = int((count / max_count) * max_bar_width)
+        bar = symbol * bar_length
+        print(f"{edge_start:6.2f} - {edge_end:6.2f}: {bar}")
 
 if __name__ == "__main__":
     main()

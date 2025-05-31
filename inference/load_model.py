@@ -10,7 +10,7 @@ def load_model():
     model_path = get_last.get_latest_model_path()
     env = DroneEnv()
     obs_dim = env.observation_space.shape[0]
-    action_dim = 2  # [dx, dy] выход Actor-а
+    action_dim = 2  # [dx, dy] - actor output
 
     agent = DDPGAgent(obs_dim, action_dim, device=DEVICE)
 

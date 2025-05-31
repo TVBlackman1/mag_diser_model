@@ -21,6 +21,7 @@ from config.train_config import (
     ACTION_NOISE_STD,
     ACTION_NOISE_STD2, ACTION_NOISE_STD3,
 )
+from utils.analyze_training_log import save_analyze_training_chart
 from utils.episode_saver import EpisodeSaver
 from utils.save import plot_episode_summary
 
@@ -134,6 +135,7 @@ def train():
             save.save_checkpoint(agent, episode)
 
     csv_log.close()
+    save_analyze_training_chart()
     save.save_critic_loss(agent)
     save.save_actor_loss(agent)
     save.save_rewards(rewards_history)

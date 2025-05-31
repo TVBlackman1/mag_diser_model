@@ -59,8 +59,9 @@ def save_critic_loss(agent):
     plt.legend()
     plt.tight_layout()
 
-    filename = f"{EXPERIMENT_FOLDER}/critic_loss_plot.png"
-    plt.savefig(filename)
+    filename = f"{EXPERIMENT_FOLDER}/critic_loss_plot"
+    save_file(plt, filename)
+    plt.close()
 
 def save_actor_loss(agent):
     plt.figure(figsize=(10, 6))
@@ -72,8 +73,9 @@ def save_actor_loss(agent):
     plt.legend()
     plt.tight_layout()
 
-    filename = f"{EXPERIMENT_FOLDER}/actor_loss_plot.png"
-    plt.savefig(filename)
+    filename = f"{EXPERIMENT_FOLDER}/actor_loss_plot"
+    save_file(plt, filename)
+    plt.close()
 
 def save_rewards(rewards, avg_window=10):
     episodes = np.arange(len(rewards))
@@ -91,8 +93,9 @@ def save_rewards(rewards, avg_window=10):
     plt.legend()
     plt.grid(True)
 
-    filename = f"{EXPERIMENT_FOLDER}/rewards_plot.png"
-    plt.savefig(filename)
+    filename = f"{EXPERIMENT_FOLDER}/rewards_plot"
+    save_file(plt, filename)
+    plt.close()
 
 def save_replay_buffer(stats: List):
     means = [s["mean"] for s in stats]
@@ -115,8 +118,9 @@ def save_replay_buffer(stats: List):
     plt.grid(True)
     plt.tight_layout()
 
-    filename = f"{EXPERIMENT_FOLDER}/replay_buffer_mean_reward_plot.png"
-    plt.savefig(filename)
+    filename = f"{EXPERIMENT_FOLDER}/replay_buffer_mean_reward_plot"
+    save_file(plt, filename)
+    plt.close()
 
 
 def plot_td_histogram(td_errors, bins=50):
@@ -130,8 +134,9 @@ def plot_td_histogram(td_errors, bins=50):
     plt.grid(True)
     plt.tight_layout()
 
-    filename = f"{EXPERIMENT_FOLDER}/replay_buffer_td_histogram_plot.png"
-    plt.savefig(filename)
+    filename = f"{EXPERIMENT_FOLDER}/replay_buffer_td_histogram_plot"
+    save_file(plt, filename)
+    plt.close()
 
 def save_q_surface(agent: DDPGAgent, env: DroneEnv, episode, resolution=50):
     os.makedirs(Q_SURFACE_DIR, exist_ok=True)
@@ -250,8 +255,8 @@ def save_q_surface(agent: DDPGAgent, env: DroneEnv, episode, resolution=50):
 
     # Сохраняем
     plt.tight_layout()
-    filename = f"{Q_SURFACE_DIR}/q_surface_{episode+1:04d}.png"
-    plt.savefig(filename)
+    filename = f"{Q_SURFACE_DIR}/q_surface_{episode+1:04d}"
+    save_file(plt, filename)
     plt.close()
 
 def norm_vector(vector):
@@ -360,6 +365,10 @@ def plot_episode_summary(episode, saver: EpisodeSaver):
     ax.legend(handles=legend_elements, loc='upper right')
 
     plt.tight_layout()
-    filename = f"{PATHS_DIR}/path{episode+1:04d}.png"
-    plt.savefig(filename)
+    filename = f"{PATHS_DIR}/path{episode+1:04d}"
+    save_file(plt, filename)
     plt.close()
+
+def save_file(plt, filename):
+    plt.savefig(f'{filename}.png')
+    plt.savefig(f'{filename}.pdf', format='pdf', bbox_inches='tight')

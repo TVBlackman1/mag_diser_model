@@ -1,6 +1,6 @@
 import math
 import torch
-from agents.ddpg_agent import DDPGAgent, map_action_to_direction
+from agents.ddpg_agent import DDPGAgent
 from env.drone_env import DroneEnv
 from inference import get_last
 from inference.load_model import load_model
@@ -28,8 +28,7 @@ def main():
             with torch.no_grad():
                 action = agent.actor(obs_tensor).squeeze(0)
 
-            direction = map_action_to_direction(action)
-            obs, reward, terminated, truncated, _ = env.step(direction)
+            obs, reward, terminated, truncated, _ = env.step(action)
 
             total_reward += reward
             if terminated or truncated:

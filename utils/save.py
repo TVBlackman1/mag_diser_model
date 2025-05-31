@@ -300,12 +300,13 @@ def plot_episode_summary(episode, saver: EpisodeSaver):
     rel_poses = np.array(rel_poses)
     num_points = len(rel_poses)
     cmap_steps = cm.get_cmap('tab20', num_points)
+    print(episode+1, ':', num_points)
 
     for i in range(num_points):
         step_color = cmap_steps(i)
         ax.plot(rel_poses[i, 0], rel_poses[i, 1], 'o', color=step_color, markersize=5)
 
-    ax.plot(rel_poses[:, 0], rel_poses[:, 1], '-', color='blue', alpha=0.3, label="Drone path")
+    ax.plot(rel_poses[:, 0], rel_poses[:, 1], '-', color='blue', alpha=0.1, label="Drone path")
 
     lim = max_dist * 1.2
     ax.set_xlim(-lim, lim)

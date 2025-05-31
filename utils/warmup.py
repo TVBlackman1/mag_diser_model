@@ -1,6 +1,5 @@
 import torch
 from env.drone_env import DroneEnv
-from agents.ddpg_agent import DIRECTIONS
 
 def run_warmup_on_env(agent, steps=500, level='warmup'):
     """
@@ -10,11 +9,10 @@ def run_warmup_on_env(agent, steps=500, level='warmup'):
     obs, _ = env.reset(options={'level_difficult': level})
 
     for _ in range(steps):
-        action_idx = env.action_space.sample()
-        move_direction = DIRECTIONS[action_idx]
+        move_direction = env.action_space.sample()
         action_tensor = torch.tensor(move_direction, dtype=torch.float32)
 
-        next_obs, reward, terminated, truncated, _ = env.step(move_direction)
+        next_obs, reward, terminated, truncated, _ = env.step(action_tensor)
         done = terminated or truncated
 
         agent.replay_buffer.add(obs, action_tensor.numpy(), reward, next_obs, float(done))

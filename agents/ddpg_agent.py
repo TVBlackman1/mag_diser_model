@@ -6,21 +6,6 @@ import numpy as np
 from networks.actor import Actor
 from networks.critic import Critic
 from utils.per_replay_buffer import PERReplayBuffer
-from utils.replay_buffer import ReplayBuffer
-
-# 8 направлений (нормализованные)
-DIRECTIONS = np.array([
-    [0, 1], [0, -1], [-1, 0], [1, 0],
-    [-1, 1], [1, 1], [-1, -1], [1, -1]
-])
-DIRECTIONS = DIRECTIONS / np.linalg.norm(DIRECTIONS, axis=1, keepdims=True)
-
-def map_action_to_direction(action) -> np.ndarray:
-    """Преобразовать выход сети в ближайшее дискретное направление"""
-    action = action.detach().cpu().numpy()
-    similarities = DIRECTIONS @ action
-    idx = np.argmax(similarities)
-    return DIRECTIONS[idx]
 
 class DDPGAgent:
     def __init__(
@@ -64,6 +49,7 @@ class DDPGAgent:
         # Replay buffer
         self.replay_buffer = PERReplayBuffer(buffer_size, batch_size, device)
 
+    @torch.no_grad()
     def select_action(self, obs, noise_std=0.1):
         """Выбираем действие на основе текущего состояния"""
         obs = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(self.device)
@@ -73,9 +59,7 @@ class DDPGAgent:
         noise = torch.randn_like(action) * noise_std
         action = torch.clamp(action + noise, -1, 1)
 
-        # Маппинг на дискретные направления
-        direction = map_action_to_direction(action)
-        return direction
+        return action
 
     def update(self):
         """Обновление нейронок на основе батча из буфера"""

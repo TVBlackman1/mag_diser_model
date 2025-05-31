@@ -19,7 +19,7 @@ from config.train_config import (
     BUFFER_SIZE,
     BATCH_SIZE,
     ACTION_NOISE_STD,
-    ACTION_NOISE_STD2,
+    ACTION_NOISE_STD2, ACTION_NOISE_STD3,
 )
 from utils.episode_saver import EpisodeSaver
 from utils.save import plot_episode_summary
@@ -53,7 +53,7 @@ def train():
 
     for episode in range(NUM_EPISODES):
         level_difficult = 'easy'
-        if episode / NUM_EPISODES >= 0.4:
+        if episode / NUM_EPISODES >= 0.4 or episode > 300:
             level_difficult = 'medium'
         # if episode / NUM_EPISODES >= 0.7:
         #     level_difficult = 'hard'
@@ -70,17 +70,19 @@ def train():
 
         for step in range(MAX_STEPS_PER_EPISODE):
             noise_std = ACTION_NOISE_STD
-            if NUM_EPISODES / NUM_EPISODES >= 0.8:
+            if episode / NUM_EPISODES >= 0.6 or episode > 600:
                 noise_std = ACTION_NOISE_STD2
+            if episode / NUM_EPISODES >= 0.8 or episode > 1500:
+                noise_std = ACTION_NOISE_STD3
 
             time_logger.start("action")
-            move_direction = agent.select_action(obs, noise_std=noise_std)
+            move_vector = agent.select_action(obs, noise_std=noise_std)
             time_logger.stop("action")
 
-            action_for_buffer = torch.tensor(move_direction, dtype=torch.float32).to(DEVICE)
+            action_for_buffer = move_vector.detach().clone()
 
             time_logger.start("env.step")
-            next_obs, reward, terminated, truncated, details = env.step(move_direction)
+            next_obs, reward, terminated, truncated, details = env.step(move_vector)
             if episode_saver is not None:
                 episode_saver.add_rewards(
                     details['target_reward'],

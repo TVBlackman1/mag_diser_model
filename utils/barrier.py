@@ -3,7 +3,7 @@ import numpy as np
 from config.drone_config import DRONE_COLLISION_RADIUS
 from config.env_config import TARGET_COLLISION_RADIUS, OBSTACLE_COLLISION_MAX_RADIUS, TARGET_COLLISION_MAX_RADIUS
 
-obs_force_scale = 190.0
+obs_force_scale = 170.0
 obs_range_scale = 0.64
 obs_max_penalty = 1000
 

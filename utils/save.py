@@ -270,12 +270,12 @@ def norm_vector(vector):
 def plot_episode_summary(episode, saver: EpisodeSaver):
     os.makedirs(PATHS_DIR, exist_ok=True)
 
-    # fig, (ax_map, ax_hist) = plt.subplots(2, 1, figsize=(10, 14), gridspec_kw={'height_ratios': [2, 1]})
-    fig, (ax_map, ax_hist) = plt.subplots(
-        2, 1,
-        figsize=(30, 14),  # ширина *3, высота та же
-        gridspec_kw={'height_ratios': [2, 1]}
-    )
+    fig, (ax_map, ax_hist) = plt.subplots(2, 1, figsize=(10, 14), gridspec_kw={'height_ratios': [2, 1]})
+    # fig, (ax_map, ax_hist) = plt.subplots(
+    #     2, 1,
+    #     figsize=(30, 14),  # ширина *3, высота та же
+    #     gridspec_kw={'height_ratios': [2, 1]}
+    # )
     # === Карта ===
     ax = ax_map
     ax.set_title("World space (centered on drone)")

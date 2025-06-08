@@ -3,3 +3,6 @@ results/*
 results_resolved/*
 .idea
 !results/2025_06_01_1602_PENALTY_TIMER_obs_closing_penalty_v2
+.env
+**/*.pyc
+**/*/.DS_Store

@@ -1,0 +1,29 @@
+version: '3'
+
+dotenv: ['.env']
+
+tasks:
+  wake:
+    desc: Send magic packet to wake the machine
+    cmds:
+      - echo "Waking up device {{.TARGET_MAC}} via {{.BROADCAST_IP}}..."
+      - wakeonlan -i {{.BROADCAST_IP}} {{.TARGET_MAC}}
+    silent: true
+
+  wait-for-ssh:
+    desc: Wait until the host is reachable over ping and then connect via SSH
+    cmds:
+      - |
+        echo "Waiting for {{.TARGET_IP}} to respond to ping..."
+        while ! ping -c 1 -W 1 {{.TARGET_IP}} &>/dev/null; do
+          sleep 1
+        done
+        echo "Host is up. Connecting via SSH..."
+        ssh {{.SSH_USER}}@{{.TARGET_IP}}
+    silent: true
+  wake-and-connect:
+    desc: Wake device and connect via SSH once reachable
+    deps: [wake]
+    cmds:
+      - task: wait-for-ssh
+    silent: true

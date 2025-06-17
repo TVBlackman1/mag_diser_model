@@ -28,7 +28,7 @@ ssh -t "$SSH_REMOTE_USER@$REMOTE_IP" "
   export TERM=xterm-256color &&
   mkdir -p '$REMOTE_DIRECTORY' &&
   fusermount -u '$REMOTE_DIRECTORY' 2>/dev/null || true &&
-  /usr/bin/sshfs '$LOCAL_USER@$LOCAL_IP:$LOCAL_PROJECT_DIR' '$REMOTE_DIRECTORY' &&
+  /usr/bin/sshfs -o allow_other '$LOCAL_USER@$LOCAL_IP:$LOCAL_PROJECT_DIR' '$REMOTE_DIRECTORY' &&
   cd '$REMOTE_DIRECTORY' &&
-  exec bash --login -i
+  exec zsh --login -i
 "

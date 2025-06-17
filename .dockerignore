@@ -1,0 +1,14 @@
+.venv/
+
+results/
+results_resolved/
+boot/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+
+.git/
+*.swp
+*.bak
+.DS_Store

@@ -1,29 +1,39 @@
-FROM python:3.11-slim
+FROM python:3.11-slim AS builder
 
-# Установим системные зависимости
 RUN apt-get update && apt-get install -y \
-    curl build-essential git \
-    libgl1-mesa-glx libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+    curl git build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-# Установим poetry
-ENV POETRY_VERSION=2.1.2
-ENV PATH="/root/.local/bin:$PATH"
-
-RUN curl -sSL https://install.python-poetry.org | python3 -
-
-# Установим рабочую директорию
 WORKDIR /app
 
-# Копируем только файлы зависимостей
+ARG POETRYVERSION='2.1.2'
+
+RUN pip install poetry==${POETRYVERSION}
+
 COPY pyproject.toml poetry.lock* ./
 
-# Установка зависимостей без виртуального окружения
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi
+RUN poetry config virtualenvs.in-project true && \
+    poetry install --no-root --only main
 
-# Копируем оставшийся проект
+# ----------------------------------------------------------------------------------------
+FROM python:3.11-slim as inference
+
+RUN apt-get update && apt-get install -y \
+    curl git build-essential libgcc1 libstdc++6 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+ARG POETRYVERSION='2.1.2'
+
+RUN pip install poetry==${POETRYVERSION}
+
+COPY --from=builder /app/.venv /app/.venv
+
+ENV POETRY_VIRTUALENVS_IN_PROJECT=true
+ENV POETRY_VIRTUALENVS_CREATE=false
+ENV PATH="/app/.venv/bin:$PATH"
+
 COPY . .
 
-# Запуск через poetry
-CMD ["poetry", "run", "python", "-m", "inference.test_loop"]
+CMD ["poetry", "run", "python", "-m", "tests.test_enabled_features"]

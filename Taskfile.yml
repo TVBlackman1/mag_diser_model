@@ -2,6 +2,9 @@ version: '3'
 
 dotenv: ['.env']
 
+vars:
+  IMAGE_NAME: test
+
 tasks:
   remote:
     desc: Connect to remote server
@@ -9,3 +12,17 @@ tasks:
       - |
         bash ./boot/mount.sh
     silent: true
+
+  docker:
+    cmds:
+      - task: docker-run
+
+  docker-build:
+    cmds:
+      - docker build -t {{.IMAGE_NAME}} .
+
+  docker-run:
+    deps: [docker-build]
+    cmds:
+      - echo "$(realpath results):/app/results"
+      - docker run --rm -v "$(realpath results):/app/results" {{.IMAGE_NAME}}

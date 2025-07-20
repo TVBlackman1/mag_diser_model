@@ -5,9 +5,11 @@ import torch
 import numpy as np
 from env.drone_env import DroneEnv
 from agents.ddpg_agent import DDPGAgent
+from utils.generation import EnvGeneratorDifferentEpisodes
 from utils import time_logger
 import random
 
+from config.env_config import FIELD_SIZE
 from config.train_config import (
     NUM_EPISODES,
     MAX_STEPS_PER_EPISODE,
@@ -31,7 +33,8 @@ def train():
     csv_log = save.CSVSaver("training_log")
     csv_log.write(["Episode", "InitialDistance", "FinalDistance", "PercentCovered", "Reward"])
 
-    env = DroneEnv()
+    env_generator = EnvGeneratorDifferentEpisodes(FIELD_SIZE, NUM_EPISODES, MAX_STEPS_PER_EPISODE)
+    env = DroneEnv(env_generator)
     obs_dim = env.observation_space.shape[0]
     action_dim = 2  # [dx, dy] выход Actor-а
 
@@ -53,13 +56,8 @@ def train():
     replay_buffer_mean_history = []
 
     for episode in range(NUM_EPISODES):
-        level_difficult = 'easy'
-        if episode / NUM_EPISODES >= 0.4 or episode > 300:
-            level_difficult = 'medium'
-        # if episode / NUM_EPISODES >= 0.7:
-        #     level_difficult = 'hard'
         time_logger.start("env.reset")
-        obs, _ = env.reset(options={'level_difficult': level_difficult})
+        obs, _ = env.reset(episode=episode, step=0)
         time_logger.stop("env.reset")
         initial_distance = obs[3] * env.max_distance
         total_reward = 0
@@ -70,6 +68,11 @@ def train():
             episode_saver = EpisodeSaver(env)
 
         for step in range(MAX_STEPS_PER_EPISODE):
+            time_logger.start("env.reset")
+            obs, _ = env.reset(episode=episode, step=step)
+            time_logger.stop("env.reset")
+            initial_distance = obs[3] * env.max_distance
+        
             noise_std = ACTION_NOISE_STD
             if episode / NUM_EPISODES >= 0.6 or episode > 600:
                 noise_std = ACTION_NOISE_STD2

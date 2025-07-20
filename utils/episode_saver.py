@@ -1,10 +1,12 @@
-class EpisodeSaver(object):
-    def __init__(self, env):
+from env.drone_env import DroneEnv
+
+class EpisodeSaver:
+    def __init__(self, env: DroneEnv):
         self.rewards_target_history = []
         self.rewards_obstacles_history = []
         self.step_penalty_history = []
 
-        self.drone_poses = [env.drone_pos[:]]
+        self.drone_poses = [env.drone.position[:]]
         self.target_pos = env.target_pos[:]
         self.obstacles = env.obstacles[:]
 

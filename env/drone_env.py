@@ -9,6 +9,7 @@ from utils.checks import is_target_reached, is_collision
 from config.env_config import FIELD_SIZE, NUM_OBSTACLES, STEP_PENALTY_MULTIPLIER, DELTA_T
 from agents.drone import Drone
 from utils.generation import EnvGenerator
+from utils.drone_view import AffineTransform2D
 
 
 class DroneEnv(gym.Env):
@@ -41,6 +42,13 @@ class DroneEnv(gym.Env):
     def reset(self, episode=0, step=0, seed=None, options=None):
         super().reset(seed=seed)
         
+        if self.env_generator is None:
+            self.target_pos = np.array([0., 0.])
+            self.drone = Drone([0., 0.])
+            self.obstacles = []
+            return self._get_obs(), {}
+
+        
         level = options['level_difficult'] if (options is not None) else ''
         env_data = self.env_generator.generate(episode, step, level)
         
@@ -68,6 +76,8 @@ class DroneEnv(gym.Env):
         self.drone.clip_in_boundary(self.field_size)
         position = self.drone.position
         
+        move = position - old_position
+        
         hit_obstacle = is_collision(position, self.obstacles)
         hit_target = is_target_reached(position, self.target_pos)
 
@@ -84,34 +94,34 @@ class DroneEnv(gym.Env):
             result = 'success'
             terminated = True
 
-        # else:
-        #     current_distance = np.linalg.norm(position - self.target_pos)
+        else:
+            current_distance = np.linalg.norm(position - self.target_pos)
 
-        #     for obs in self.obstacles:
-        #         value, dir = get_obs_force_field(position, obs)
-        #         dir = dir / np.linalg.norm(dir)
-        #         alignment = np.dot(move, dir)
-        #         if alignment > 0:
-        #             obstacle_penalty += alignment * value
-        #     reward += obstacle_penalty
+            for obs in self.obstacles:
+                value, dir = get_obs_force_field(position, obs)
+                dir = dir / np.linalg.norm(dir)
+                alignment = np.dot(move, dir)
+                if alignment > 0:
+                    obstacle_penalty += alignment * value
+            reward += obstacle_penalty
 
-        #     if current_distance > 1e-5:
-        #         value, _ = get_target_force_near_field(new_pos, self.target_pos)
-        #         target_reward += value
+            if current_distance > 1e-5:
+                value, _ = get_target_force_near_field(position, self.target_pos)
+                target_reward += value
 
-        #         vector = self.target_pos - new_pos
-        #         dist = np.linalg.norm(vector)
-        #         vector = vector / dist
-        #         alignment = np.dot(move, vector)
-        #         if alignment > 0:
-        #             target_reward += alignment * 2
-        #     reward += target_reward
-        #     step_penalty = -STEP_PENALTY_MULTIPLIER * (current_distance / self.max_distance)
-        #     reward += step_penalty * (self.step_number * 80)
+                vector = self.target_pos - position
+                dist = np.linalg.norm(vector)
+                vector = vector / dist
+                alignment = np.dot(move, vector)
+                if alignment > 0:
+                    target_reward += alignment * 2
+            reward += target_reward
+            step_penalty = -STEP_PENALTY_MULTIPLIER * (current_distance / self.max_distance)
+            reward += step_penalty * (self.step_number * 80)
 
-        #     # Обновляем дистанцию до цели
-        #     self.last_distance_to_target = current_distance
-        # self.drone_pos = new_pos
+            # Обновляем дистанцию до цели
+            self.last_distance_to_target = current_distance
+
         obs = self._get_obs()
         return obs, reward, terminated, False, {
             'target_reward': target_reward,
@@ -126,21 +136,22 @@ class DroneEnv(gym.Env):
         obstacles = sorted(self.obstacles, key=lambda _obs: np.linalg.norm(_obs - self.drone.position))[:top]
 
         fill_array = [0 for i in range((top+1) * parameters)]
-        self._get_partical_obs(self.target_pos, fill_array, 0)
+        
+        transform = AffineTransform2D(self.drone.position, self.drone.orientation)
+        self._get_partical_obs(transform, self.target_pos, fill_array, 0)
         for i, obs in enumerate(obstacles):
-            self._get_partical_obs(obs, fill_array, (i+1) * parameters)
+            self._get_partical_obs(transform, obs, fill_array, (i+1) * parameters)
         obs = np.array(fill_array, dtype=np.float32)
         return obs
 
-    def _get_partical_obs(self, object_pos, fill_np_array, start_index=0, exist=True):
-        direction_vector = object_pos - self.drone.position
-        distance = np.linalg.norm(direction_vector)
+    def _get_partical_obs(self, transform: AffineTransform2D, object_pos, fill_np_array, start_index=0, exist=True):
+        relative_vector = transform.apply([object_pos])[:, 0]
+        distance = np.linalg.norm(relative_vector)
 
         exist_flag = 1.0 if exist else 0.0
-
         if not exist or distance > 1e-5:
-            cos_theta = direction_vector[1] / distance
-            sin_theta = direction_vector[0] / distance
+            cos_theta = relative_vector[1] / distance
+            sin_theta = relative_vector[0] / distance
             distance_normalized = np.clip(distance / self.max_distance, 0.0, 1.0)
         else:
             cos_theta = 0.0

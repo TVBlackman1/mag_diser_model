@@ -6,6 +6,7 @@ import numpy as np
 from env.drone_env import DroneEnv
 from agents.ddpg_agent import DDPGAgent
 from utils.generation import EnvGeneratorDifferentEpisodes
+from utils.device_support import get_device
 from utils import time_logger
 import random
 
@@ -27,7 +28,7 @@ from utils.analyze_training_log import save_analyze_training_chart
 from utils.episode_saver import EpisodeSaver
 from utils.save import plot_episode_summary
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = get_device()
 
 def train():
     csv_log = save.CSVSaver("training_log")
@@ -50,7 +51,7 @@ def train():
         device=DEVICE
     )
 
-    utils.warmup.generate_warmup_experience(agent)
+    utils.warmup.generate_warmup_experience(agent, FIELD_SIZE)
 
     rewards_history = []
     replay_buffer_mean_history = []
@@ -93,7 +94,7 @@ def train():
                     details['obstacle_penalty'],
                     details['step_penalty']
                 )
-                episode_saver.add_drone_pos(env.drone_pos)
+                episode_saver.add_drone_pos(env.drone.position)
             time_logger.stop("env.step")
 
             done = terminated or truncated

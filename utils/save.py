@@ -179,7 +179,7 @@ def save_q_surface(agent: DDPGAgent, env: DroneEnv, episode, resolution=50):
 
     max_dist = 1.0
     if env.target_pos is not None:
-        relative_target = np.array(env.target_pos) - env.drone_pos
+        relative_target = np.array(env.target_pos) - env.drone.position
         ax2.plot(relative_target[0], relative_target[1], 'ro', label="Target")
         ax3.plot(relative_target[0], relative_target[1], 'ro', label="Target")
         ax4.plot(relative_target[0], relative_target[1], 'ro', label="Target")
@@ -187,7 +187,7 @@ def save_q_surface(agent: DDPGAgent, env: DroneEnv, episode, resolution=50):
 
     if env.obstacles:
         for i, obs in enumerate(env.obstacles):
-            rel_obs = np.array(obs) - env.drone_pos
+            rel_obs = np.array(obs) - env.drone.position
             ax2.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
             ax3.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
             ax4.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
@@ -225,8 +225,8 @@ def save_q_surface(agent: DDPGAgent, env: DroneEnv, episode, resolution=50):
 
     for i in range(portrait_resolution):
         for j in range(portrait_resolution):
-            pos = np.array([X[i, j], Y[i, j]]) + env.drone_pos
-            tmp_env = DroneEnv()
+            pos = np.array([X[i, j], Y[i, j]]) + env.drone.position
+            tmp_env = DroneEnv(None)
             tmp_env.set_positions(pos, env.target_pos, env.obstacles)
             obs = tmp_env.get_current_obs()
             obs_tensor_local = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)

@@ -15,9 +15,10 @@ EXPERIMENT_NOTES = '''
 - бонус за уход от препятствия в сторону, не только назад
 - убраны награды за уход от препятствий, есть только штрафы за приближение к ним
 - штраф за бездействие постоянно растет
+- теперь используется движение по скорости и скорости поворота, а не dx, dy
 '''
 
-PROJECT_GLOBAL_STATE = "PENALTY_TIMER"
+PROJECT_GLOBAL_STATE = "ANGLE_VELOCITY"
 
 
 EXPERIMENT_DATE = datetime.now().strftime("%Y_%m_%d_%H%M")

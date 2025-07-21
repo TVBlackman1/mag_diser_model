@@ -7,6 +7,7 @@ from gymnasium import spaces
 from utils.barrier import get_obs_force_field, get_target_force_near_field
 from utils.checks import is_target_reached, is_collision
 from config.env_config import FIELD_SIZE, NUM_OBSTACLES, STEP_PENALTY_MULTIPLIER, DELTA_T
+from config.train_config import MAX_STEPS_PER_EPISODE
 from agents.drone import Drone
 from utils.generation import EnvGenerator
 from utils.drone_view import AffineTransform2D
@@ -21,13 +22,17 @@ class DroneEnv(gym.Env):
         self.max_distance = np.sqrt(2 * self.field_size ** 2)
 
         self.step_number = 0
+        self.drone = None
         self.delta_time = DELTA_T
         self.env_generator: EnvGenerator = generator
 
         self.action_space = action_space()
         self.observation_space = observation_space()
+        
+        self.last_episode = -1
 
         self.reset()
+        # self.last_episode = -1
 
     def set_positions(self, drone_pos, target_pos, obstacles):
         self.num_obstacles = len(obstacles)
@@ -38,7 +43,7 @@ class DroneEnv(gym.Env):
 
     def get_current_obs(self):
         return self._get_obs()
-
+    
     def reset(self, episode=0, step=0, seed=None, options=None):
         super().reset(seed=seed)
         
@@ -52,12 +57,17 @@ class DroneEnv(gym.Env):
         level = options['level_difficult'] if (options is not None) else ''
         env_data = self.env_generator.generate(episode, step, level)
         
-        self.drone = Drone(env_data["drone_pos"])
+        # self.drone = Drone(env_data["drone_pos"])
+        if self.drone is None:
+            self.drone = Drone(env_data["drone_pos"])
         self.target_pos : np.ndarray = env_data["target_pos"]
         self.obstacles : typing.Tuple[np.ndarray] = env_data["obstacles"]
 
         self.last_distance_to_target = np.linalg.norm(self.drone.position - self.target_pos)
-        self.step_number = 0
+        if self.last_episode != episode:
+            self.drone = Drone(env_data["drone_pos"])
+            self.last_episode = episode
+            self.step_number = 0
 
         return self._get_obs(), {}
 
@@ -71,10 +81,10 @@ class DroneEnv(gym.Env):
         action = action.detach().numpy()
         speed_ratio, angle_ratio = action[0], action[1]
 
-        old_position = self.drone.position
+        old_position = self.drone.position.copy()
         self.drone.move(speed_ratio, angle_ratio, self.delta_time)
         self.drone.clip_in_boundary(self.field_size)
-        position = self.drone.position
+        position = self.drone.position.copy()
         
         move = position - old_position
         
@@ -83,6 +93,9 @@ class DroneEnv(gym.Env):
 
         reward = 0.0
         terminated = False
+        
+        last_dinstance = 0.0
+        new_distance = 0.0
 
         if hit_obstacle:
             reward = -10000
@@ -97,29 +110,48 @@ class DroneEnv(gym.Env):
         else:
             current_distance = np.linalg.norm(position - self.target_pos)
 
-            for obs in self.obstacles:
-                value, dir = get_obs_force_field(position, obs)
-                dir = dir / np.linalg.norm(dir)
-                alignment = np.dot(move, dir)
-                if alignment > 0:
-                    obstacle_penalty += alignment * value
-            reward += obstacle_penalty
+            # for obs in self.obstacles:
+            #     value, dir = get_obs_force_field(position, obs)
+            #     dir = dir / np.linalg.norm(dir)
+            #     alignment = np.dot(move, dir)
+            #     if alignment > 0:
+            #         obstacle_penalty += alignment * value
+            # reward += obstacle_penalty
 
-            if current_distance > 1e-5:
-                value, _ = get_target_force_near_field(position, self.target_pos)
-                target_reward += value
+            # if current_distance > 1e-5:
+            #     # value, _ = get_target_force_near_field(position, self.target_pos)
+            #     # target_reward += value
 
-                vector = self.target_pos - position
-                dist = np.linalg.norm(vector)
-                vector = vector / dist
-                alignment = np.dot(move, vector)
-                if alignment > 0:
-                    target_reward += alignment * 2
-            reward += target_reward
-            step_penalty = -STEP_PENALTY_MULTIPLIER * (current_distance / self.max_distance)
-            reward += step_penalty * (self.step_number * 80)
+            #     # vector = self.target_pos - position
+            #     # dist = np.linalg.norm(vector)
+            #     # vector = vector / dist
+            #     # alignment = np.dot(move, vector)
+            #     # if alignment > 0:
+            #     #     target_reward += alignment * 2
+                    
+            #     old_distanse = np.linalg.norm(old_position - self.target_pos)
+            #     distanse = np.linalg.norm(position - self.target_pos)
+            #     target_reward += np.pow((old_distanse - distanse), 1)
+            #     if np.linalg.norm(move) < 0.7:
+            #         target_reward *= -1
+            
+            old_distanse = np.linalg.norm(old_position - self.target_pos)
+            distanse = np.linalg.norm(position - self.target_pos)
+            
+            target_reward = (old_distanse - distanse) / self.last_distance_to_target
+            # target_reward = np.exp(-alpha * distance_to_target) - 1.0
+            step_penalty += 1 / MAX_STEPS_PER_EPISODE
+            
+            reward = target_reward - step_penalty
+                
+            # reward += target_reward
+            # step_penalty = -STEP_PENALTY_MULTIPLIER * 1
+            # step_penalty = -STEP_PENALTY_MULTIPLIER * (current_distance / self.max_distance)
+            # reward += step_penalty * (self.step_number * 12)
 
             # Обновляем дистанцию до цели
+            last_dinstance = self.last_distance_to_target
+            new_distance = current_distance
             self.last_distance_to_target = current_distance
 
         obs = self._get_obs()
@@ -128,6 +160,8 @@ class DroneEnv(gym.Env):
             'step_penalty': step_penalty,
             'obstacle_penalty': obstacle_penalty,
             'result': result,
+            'last_dinstance': last_dinstance,
+            'new_distance': new_distance,
         }
 
     def _get_obs(self):

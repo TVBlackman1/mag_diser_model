@@ -66,9 +66,9 @@ class EnvGeneratorDifferentEpisodes(EnvGenerator):
         episode_positions = {
             "drone_pos": drone_pos,
             "target_pos": target_pos,
-            "obstacles": obstacles
+            "obstacles": []
         }
-        self.last_episode = episode        
+        self.last_episode = episode
         self.last_positions = episode_positions
         return episode_positions
 

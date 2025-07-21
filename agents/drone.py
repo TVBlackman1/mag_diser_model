@@ -20,10 +20,10 @@ class Drone:
         self.orientation += angle_ratio * DRONE_ANGULAR_VELOCITY * delta_time
         
         vector = speed_ratio * max_speed * delta_time
-        self.position += np.array([
+        self.position = self.position + np.array([
             cos(self.orientation + np.pi) * vector,
             sin(self.orientation + np.pi) * vector
         ])
-    
+ 
     def clip_in_boundary(self, boundary_size: float):
         self.position = np.clip(self.position, 0.0, boundary_size)

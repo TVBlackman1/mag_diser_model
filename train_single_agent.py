@@ -8,6 +8,7 @@ from agents.ddpg_agent import DDPGAgent
 from utils.generation import EnvGeneratorDifferentEpisodes
 from utils.device_support import get_device
 from utils import time_logger
+from utils.db import DBSaver
 import random
 
 from config.env_config import FIELD_SIZE
@@ -32,6 +33,7 @@ DEVICE = get_device()
 
 def train():
     csv_log = save.CSVSaver("training_log")
+    db_saver = DBSaver()
     csv_log.write(["Episode", "InitialDistance", "FinalDistance", "PercentCovered", "Reward"])
 
     env_generator = EnvGeneratorDifferentEpisodes(FIELD_SIZE, NUM_EPISODES, MAX_STEPS_PER_EPISODE)
@@ -57,6 +59,8 @@ def train():
     replay_buffer_mean_history = []
 
     for episode in range(NUM_EPISODES):
+        db_saver.start_new_episode(episode)
+        
         time_logger.start("env.reset")
         obs, _ = env.reset(episode=episode, step=0)
         time_logger.stop("env.reset")
@@ -87,7 +91,16 @@ def train():
             action_for_buffer = move_vector.detach().clone()
 
             time_logger.start("env.step")
+            
+            previous_drone_pos = env.drone.position.copy()
             next_obs, reward, terminated, truncated, details = env.step(move_vector)
+            db_saver.add_step(step,
+                previous_drone_pos[0], previous_drone_pos[1],
+                env.drone.position[0], env.drone.position[1],
+                action_for_buffer[0], action_for_buffer[1],
+                details['last_dinstance'], details['new_distance'],
+                reward, "",
+            )
             if episode_saver is not None:
                 episode_saver.add_rewards(
                     details['target_reward'],
@@ -102,7 +115,6 @@ def train():
             time_logger.start("replay_buffer.add")
             agent.replay_buffer.add(obs, action_for_buffer.cpu().numpy(), reward, next_obs, float(done))
             time_logger.stop("replay_buffer.add")
-
 
             time_logger.start("agent.update")
             agent.update()

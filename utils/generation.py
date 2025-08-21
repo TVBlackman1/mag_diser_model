@@ -115,7 +115,7 @@ class EnvGeneratorDynamic(EnvGenerator):
         mu = 1.3
         self.dist_obstacle_count = poisson(mu)
         self.dist_obstacle_angle = uniform(0, 2*np.pi)
-        self.dist_obstacle_distantion = erlang(3.0, 0.9)
+        self.dist_obstacle_distance = erlang(3.0, 0.9)
         
         self.last_episode = -1
         
@@ -153,7 +153,7 @@ class EnvGeneratorDynamic(EnvGenerator):
         min_shift_from_drone = OBSTACLE_COLLISION_MAX_RADIUS + 0.1
         for _ in range(count):
             angle = self.dist_obstacle_angle.rvs() + drone.orientation
-            distance = self.dist_obstacle_distantion.rvs() + min_shift_from_drone
+            distance = self.dist_obstacle_distance.rvs() + min_shift_from_drone
             x_shift = distance * np.cos(angle)
             y_shift = distance * np.sin(angle)
             ret.append(np.array([

@@ -12,7 +12,9 @@ def save_analyze_training_chart():
     log_path = f"results/{last_result_path}/training_log.csv"
     path_coverage_path = f"results/{last_result_path}/training_log"
 
+    db_path = f"results/{last_result_path}/data.db"
     print(log_path)
+    print(db_path)
     if not os.path.exists(log_path):
         print("Training log not found!")
         return

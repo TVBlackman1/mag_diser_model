@@ -1,4 +1,5 @@
 import time
+from contextlib import contextmanager
 import csv
 from config.version import EXPERIMENT_FOLDER
 
@@ -9,14 +10,14 @@ _start_times = {}
 
 
 def start(label: str):
-    """Начинает отсчет времени для данной метки"""
+    """Starts the timer for the given label"""
     _start_times[label] = time.perf_counter()
 
 
 def stop(label: str):
-    """Останавливает отсчет и обновляет статистику по метке"""
+    """Stops the timer for the given label"""
     if label not in _start_times:
-        raise ValueError(f"Не было вызова start() для '{label}'")
+        raise ValueError(f"start() command has not been invoked for'{label}'")
 
     elapsed = time.perf_counter() - _start_times.pop(label)
 
@@ -34,6 +35,14 @@ def stop(label: str):
         stats["min"] = min(stats["min"], elapsed)
         stats["max"] = max(stats["max"], elapsed)
 
+@contextmanager
+def time_logger(label):
+    start(label)
+    try:
+        yield
+    finally:
+        stop(label)
+        
 def export_csv():
     """Экспортирует данные в CSV"""
     filepath = f"{EXPERIMENT_FOLDER}/timer.csv"

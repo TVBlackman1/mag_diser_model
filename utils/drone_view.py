@@ -9,7 +9,8 @@ class AffineTransform2D:
         T = self.T(-start_position[0], -start_position[1])
         self.Q = R @ T
     
-    def R(self, theta):
+    @staticmethod
+    def R(theta):
         cos_theta = math.cos(theta)
         sin_theta = math.sin(theta)
         return np.array([
@@ -17,7 +18,8 @@ class AffineTransform2D:
             [sin_theta, cos_theta],
         ])
 
-    def T(self, dx, dy):
+    @staticmethod
+    def T(dx, dy):
         return np.array([
             [1, 0, dx],
             [0, 1, dy],

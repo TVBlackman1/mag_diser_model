@@ -11,20 +11,24 @@ class DBSaver:
         file = f"{EXPERIMENT_FOLDER}/data.db"
         self.con = duckdb.connect(file)
         self.episode = 0
+        self.is_train = True
         self.con.execute("CREATE TABLE experiments (episode INTEGER, step INTEGER,"
                          "x FLOAT, y FLOAT, new_x FLOAT, new_y FLOAT,"
                          "speed_ratio FLOAT, angle_ratio FLOAT,"
-                         "target_distance FLOAT, new_target_distance FLOAT, reward FLOAT, result VARCHAR(10)"
+                         "target_distance FLOAT, new_target_distance FLOAT, reward FLOAT, result VARCHAR(10),"
+                         "is_train BOOLEAN"
                          ")")
-    def start_new_episode(self, episode: int):
+    def start_new_episode(self, episode: int, is_train: bool):
         self.episode = episode
+        self.is_train = is_train
     
     def add_step(self, step: int, x, y, new_x, new_y,
                  speed_ratio,
                  angle_ratio,
                  target_distance, new_target_distance, reward, result):
-        self.con.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+        self.con.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
             self.episode, step, float(x), float(y), float(new_x), float(new_y), float(speed_ratio),
             float(angle_ratio),
             float(target_distance), float(new_target_distance), float(reward), result,
+            self.is_train,
         ])

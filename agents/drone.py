@@ -18,6 +18,7 @@ class Drone:
             max_speed = DRONE_BACKWARD_SPEED
         
         self.orientation += angle_ratio * DRONE_ANGULAR_VELOCITY * delta_time
+        self.orientation = np.atan2(np.sin(self.orientation),np.cos(self.orientation))
         
         vector = speed_ratio * max_speed * delta_time
         self.position = self.position + np.array([

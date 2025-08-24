@@ -1,10 +1,6 @@
 import duckdb
-
+from pathlib import Path
 from config.version import EXPERIMENT_FOLDER
-
-RESULT_SUCCESS = "success"
-RESULT_FAILED = "failed"
-RESULT_PROGRESS = "progress"
 
 class DBSaver:
     def __init__(self):
@@ -12,12 +8,11 @@ class DBSaver:
         self.con = duckdb.connect(file)
         self.episode = 0
         self.is_train = True
-        self.con.execute("CREATE TABLE experiments (episode INTEGER, step INTEGER,"
-                         "x FLOAT, y FLOAT, new_x FLOAT, new_y FLOAT,"
-                         "speed_ratio FLOAT, angle_ratio FLOAT,"
-                         "target_distance FLOAT, new_target_distance FLOAT, reward FLOAT, result VARCHAR(10),"
-                         "is_train BOOLEAN"
-                         ")")
+
+        migration_path = Path("./utils/db/migration.sql")
+        sql_content = migration_path.read_text(encoding="utf-8")
+
+        self.con.execute(sql_content)
     def start_new_episode(self, episode: int, is_train: bool):
         self.episode = episode
         self.is_train = is_train
@@ -26,7 +21,7 @@ class DBSaver:
                  speed_ratio,
                  angle_ratio,
                  target_distance, new_target_distance, reward, result):
-        self.con.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+        self.con.execute("INSERT INTO experiments VALUES (nextval('seq_experiment_id'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
             self.episode, step, float(x), float(y), float(new_x), float(new_y), float(speed_ratio),
             float(angle_ratio),
             float(target_distance), float(new_target_distance), float(reward), result,

@@ -4,7 +4,7 @@ MAX_STEPS_PER_EPISODE = 200
 EVAL_INTERVAL = 50  # каждые 50 эпизодов сохраняем модель
 
 TRAIN_COUNT = 40
-TEST_COUNT = 3
+TEST_COUNT = 1
 
 # Гиперпараметры агента
 ACTOR_LR = 1e-4

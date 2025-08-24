@@ -93,6 +93,8 @@ def train():
             next_obs, reward, terminated, truncated, details = env.step(move_vector)
             done = terminated or truncated
 
+            if step == MAX_STEPS_PER_EPISODE - 1:
+                details['result'] = 'expired'
             db_saver.add_step(step,
                 previous_drone_pos[0], previous_drone_pos[1],
                 env.env_data.drone.position[0], env.env_data.drone.position[1],

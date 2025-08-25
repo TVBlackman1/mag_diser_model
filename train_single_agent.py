@@ -1,4 +1,4 @@
-from utils.episode_saver import EpisodeSaver
+from utils.episode_saver import EpisodeSaverStatic
 from utils.episode_train_policy import TrainingEvaluator
 import utils.warmup
 from utils import save
@@ -54,7 +54,7 @@ def train():
         device=DEVICE
     )
 
-    episode_saver = EpisodeSaver()
+    episode_saver = EpisodeSaverStatic()
 
     utils.warmup.generate_warmup_experience(agent, FIELD_SIZE)
 
@@ -69,12 +69,11 @@ def train():
             env.env_generator = env_train_generator
         else:
             env.env_generator = env_test_generator
-            episode_saver.start_episode(env)
 
         total_reward = 0
         
         for step in range(MAX_STEPS_PER_EPISODE):
-            env.env_generator.set_state(episode=episode, step=step)
+            env.env_generator.set_state(episode=episode, step=step, difficult_level='medium')
             obs, _ = env.reset()
         
             noise_std = get_noise(
@@ -109,6 +108,7 @@ def train():
 
                 replay_buffer_mean_history.append(agent.replay_buffer.get_stats())
             else:
+                episode_saver.setup(env, episode)
                 episode_saver.add_rewards(
                     details['target_reward'],
                     details['obstacle_penalty'],

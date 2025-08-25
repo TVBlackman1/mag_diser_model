@@ -134,7 +134,10 @@ class EnvGeneratorDynamic(EnvGenerator):
         if drone is None:
             obstacles = self.get_obstacles(current_env.drone)
         else:
-            obstacles = self.get_obstacles(drone)
+            if self.step % 6 == 0:
+                obstacles = self.get_obstacles(drone)
+            else:
+                obstacles = None
 
         return EnvData(
             drone=drone,

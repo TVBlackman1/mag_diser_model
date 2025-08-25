@@ -10,7 +10,7 @@ from matplotlib.patches import Patch
 from agents.ddpg_agent import DDPGAgent
 from config.version import EXPERIMENT_FOLDER, EXPERIMENT_NOTES
 from env.drone_env import DroneEnv
-from utils.episode_saver import EpisodeSaver
+from utils.episode_saver import EpisodeSaverStatic
 
 CHECKPOINTS_SUBDIR = "checkpoints"
 Q_SURFACE_SUBDIR = "q_surfaces"
@@ -146,7 +146,7 @@ def norm_vector(vector):
 
 
 
-def plot_episode_summary(episode, saver: EpisodeSaver):
+def plot_episode_summary(episode, saver: EpisodeSaverStatic):
     os.makedirs(PATHS_DIR, exist_ok=True)
 
     fig, (ax_map, ax_hist) = plt.subplots(2, 1, figsize=(10, 14), gridspec_kw={'height_ratios': [2, 1]})

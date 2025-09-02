@@ -1,11 +1,42 @@
-
-select * from (select
-    core_experiments.episode, step, new_target_distance as final_distance, result, reward_i, core_experiments.is_train
-from data.experiments as core_experiments right join (
+with episode_summary as (
     select
-        episode as episode_i, max(step) as step_i, sum(reward) as reward_i
-    from data.experiments group by episode
-) on core_experiments.episode=episode_i and core_experiments.step=step_i
-) as core_experiments left join (
-    select episode, target_distance as initial_distance from data.experiments where step=0
-) as start_step_experiments on start_step_experiments.episode=core_experiments.episode where result <> 'fail' and is_train = false order by (final_distance);
+        episode,
+        max(step) as final_step,
+        sum(reward) as total_reward,
+        mean(speed_ratio) as mean_speed_ratio,
+    from data.experiments
+    group by episode
+),
+last_steps as (
+    select
+        e.episode,
+        e.step,
+        e.new_target_distance as final_distance,
+        e.result,
+        e.is_train
+    from data.experiments e
+    join episode_summary s
+      on e.episode = s.episode and e.step = s.final_step
+),
+first_steps as (
+    select
+        episode,
+        target_distance as initial_distance
+    from data.experiments
+    where step = 0
+)
+select
+    l.episode,
+    l.step as final_step,
+    f.initial_distance,
+    l.final_distance,
+    s.mean_speed_ratio,
+    s.total_reward,
+    l.result,
+    l.is_train,
+from last_steps l
+join episode_summary s on l.episode = s.episode
+left join first_steps f on l.episode = f.episode
+where l.result <> 'fail'
+  and l.is_train = false
+order by l.final_distance;

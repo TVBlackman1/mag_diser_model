@@ -10,7 +10,7 @@ from utils.checks import is_collision_in_movement, is_target_reached_in_movement
 from config.env_config import (
     FIELD_SIZE, NUM_OBSTACLES, STEP_PENALTY_MULTIPLIER, DELTA_T, OBSTACLE_COLLISION_RADIUS, OBSTACLE_COLLISION_MAX_RADIUS
 )
-from config.drone_config import DRONE_COLLISION_RADIUS, DRONE_FORWARD_SPEED
+from config.drone_config import DRONE_COLLISION_RADIUS, DRONE_MAX_FORWARD_SPEED
 from config.train_config import MAX_STEPS_PER_EPISODE, NUM_EPISODES
 from agents.drone import Drone
 from utils.generation import EnvData, EnvGenerator
@@ -80,8 +80,8 @@ class DroneEnv(gym.Env):
         reward = 0.0
         terminated = False
 
-        last_distance = 0.0
-        new_distance = 0.0
+        last_distance = -1
+        new_distance = -1
 
         if hit_obstacle:
             reward = -10000
@@ -94,75 +94,25 @@ class DroneEnv(gym.Env):
             terminated = True
 
         else:
-            current_distance = np.linalg.norm(position - self.env_data.target_position)
+            old_distance_to_target = float(np.linalg.norm(old_position - self.env_data.target_position))
+            distance_to_target = float(np.linalg.norm(position - self.env_data.target_position))
 
-            acc_radius = DRONE_COLLISION_RADIUS + OBSTACLE_COLLISION_RADIUS
-            # for obs in self.obstacles:
-            #     dy = obs[1] - old_position[1]
-            #     dx = obs[0] - old_position[0]
-            #     angle_to_obstable = np.atan2(dy, dx)
-                
-            #     dist = np.linalg.norm(obs - old_position)
-                # MAX_DISTANCE = DRONE_FORWARD_SPEED * self.delta_time
-            #     if dist + OBSTACLE_COLLISION_MAX_RADIUS > 2:
-            #         continue
-                
-            #     min_angle_from_obs_dir = np.arcsin(acc_radius/dist)
-            #     if (
-            #         orientation <= angle_to_obstable + min_angle_from_obs_dir or
-            #         orientation >= angle_to_obstable - min_angle_from_obs_dir
-            #     ):
-            #         # obstacle_penalty = MAX_DISTANCE / (dist + OBSTACLE_COLLISION_MAX_RADIUS)
-            #         obstacle_penalty = 2
-                # value, dir = get_obs_force_field(position, obs)
-                # dir = dir / np.linalg.norm(dir)
-                # alignment = np.dot(move, dir)
-                # if alignment > 0:
-                #     obstacle_penalty += alignment * value
-            # reward += obstacle_penalty
+            step_penalty += 3 / MAX_STEPS_PER_EPISODE
 
-            # if current_distance > 1e-5:
-            #     # value, _ = get_target_force_near_field(position, self.target_pos)
-            #     # target_reward += value
+            progress = old_distance_to_target - distance_to_target
+            normalized = progress / (DRONE_MAX_FORWARD_SPEED * self.delta_time)
+            target_reward += normalized**2  # линейно, 0..1
 
-            #     # vector = self.target_pos - position
-            #     # dist = np.linalg.norm(vector)
-            #     # vector = vector / dist
-            #     # alignment = np.dot(move, vector)
-            #     # if alignment > 0:
-            #     #     target_reward += alignment * 2
-
-            #     old_distanse = np.linalg.norm(old_position - self.target_pos)
-            #     distanse = np.linalg.norm(position - self.target_pos)
-            #     target_reward += np.pow((old_distanse - distanse), 1)
-            #     if np.linalg.norm(move) < 0.7:
-            #         target_reward *= -1
-
-            old_distance = float(np.linalg.norm(old_position - self.env_data.target_position))
-            distance = float(np.linalg.norm(position - self.env_data.target_position))
-
-            # if np.linalg.norm(move) < 15 * self.delta_time * 0.2:
+            # if old_distance_to_target - distance_to_target < DRONE_MAX_FORWARD_SPEED * self.delta_time * 0.10:
             #     step_penalty += 1
-            step_penalty += 1 / MAX_STEPS_PER_EPISODE
-
-            target_reward = (old_distance - distance) / old_distance
-            if old_distance - distance < 15 * self.delta_time * 0.10:
-                step_penalty += 1
-            else:
-                target_reward += np.sqrt((old_distance - distance) / (15 * self.delta_time))
-            # target_reward = np.exp(-alpha * distance_to_target) - 1.0
+            # else:
+            #     target_reward += np.sqrt((old_distance_to_target - distance_to_target) / (DRONE_MAX_FORWARD_SPEED * self.delta_time))
 
             reward = target_reward - step_penalty - obstacle_penalty
 
-            # reward += target_reward
-            # step_penalty = -STEP_PENALTY_MULTIPLIER * 1
-            # step_penalty = -STEP_PENALTY_MULTIPLIER * (current_distance / self.max_distance)
-            # reward += step_penalty * (self.step_number * 12)
-
             # Обновляем дистанцию до цели
-            last_distance = self.last_distance_to_target
-            new_distance = current_distance
-            self.last_distance_to_target = current_distance
+            last_distance = old_distance_to_target
+            new_distance = distance_to_target
 
         obs = self._get_obs()
         return obs, reward, terminated, False, {

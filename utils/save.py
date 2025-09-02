@@ -184,7 +184,6 @@ def plot_episode_summary(episode, saver: EpisodeSaverStatic):
     rel_poses = np.array(rel_poses)
     num_points = len(rel_poses)
     cmap_steps = cm.get_cmap('tab20', num_points)
-    print(episode+1, ':', num_points)
 
     for i in range(num_points):
         step_color = cmap_steps(i)
@@ -244,7 +243,7 @@ def plot_episode_summary(episode, saver: EpisodeSaverStatic):
     ax.legend(handles=legend_elements, loc='upper right')
 
     plt.tight_layout()
-    filename = f"{PATHS_DIR}/path{episode+1:04d}"
+    filename = f"{PATHS_DIR}/path{episode:04d}"
     save_file(plt, filename)
     plt.close()
 

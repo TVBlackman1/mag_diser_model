@@ -13,6 +13,7 @@ class DBSaver:
         sql_content = migration_path.read_text(encoding="utf-8")
 
         self.con.execute(sql_content)
+        print(f"db created: {Path(file).absolute()}")
     def start_new_episode(self, episode: int, is_train: bool):
         self.episode = episode
         self.is_train = is_train
@@ -27,3 +28,17 @@ class DBSaver:
             float(target_distance), float(new_target_distance), float(reward), result,
             self.is_train,
         ])
+
+    def add_step2(self, step: int,old_drone_pos, new_drone_pos,
+                  obstacles: [],
+                  speed_ratio,
+                  angle_ratio,
+                  target_distance, new_target_distance, reward, result
+                  ):
+        self.con.execute("INSERT INTO experiments VALUES (nextval('seq_experiment_id'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+            self.episode, step, float(x), float(y), float(new_x), float(new_y), float(speed_ratio),
+            float(angle_ratio),
+            float(target_distance), float(new_target_distance), float(reward), result,
+            self.is_train,
+        ])
+

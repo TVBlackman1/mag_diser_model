@@ -125,8 +125,8 @@ def train():
 
         if not is_train:
             plot_episode_summary(episode=episode, saver=episode_saver)
-        if (episode + 1) % 10 == 0:
-            avg_reward = np.mean(rewards_history[-10:])
+        if (episode + 1) % 50 == 0:
+            avg_reward = np.mean(rewards_history[-50:])
             print(f"Episode {episode+1}, Average Reward: {avg_reward:.2f}")
 
         if (episode + 1) % EVAL_INTERVAL == 0:
@@ -142,12 +142,12 @@ def train():
 
 
 def get_noise(episode: int, num_episodes: int, step: int, num_steps: int):
+    noise_std = ACTION_NOISE_STD
     if episode / num_episodes >= 0.4 or episode > 600:
-        return ACTION_NOISE_STD2
+        noise_std =  ACTION_NOISE_STD2
     elif episode / num_episodes >= 0.8 or episode > 1500:
-        return ACTION_NOISE_STD3
-    else:
-        return ACTION_NOISE_STD
+        noise_std =  ACTION_NOISE_STD3
+    return noise_std
 
 
 if __name__ == "__main__":

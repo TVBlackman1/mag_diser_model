@@ -7,10 +7,9 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 from matplotlib.patches import Patch
 
-from agents.ddpg_agent import DDPGAgent
 from config.version import EXPERIMENT_FOLDER, EXPERIMENT_NOTES
 from env.drone_env import DroneEnv
-from utils.episode_saver import EpisodeSaver
+from utils.episode_saver import EpisodeSaverStatic
 
 CHECKPOINTS_SUBDIR = "checkpoints"
 Q_SURFACE_SUBDIR = "q_surfaces"
@@ -25,9 +24,7 @@ def create_save_dir():
     with open(f'{EXPERIMENT_FOLDER}/description.txt', 'w', newline='') as file:
         file.write(EXPERIMENT_NOTES)
 
-def save_checkpoint(agent, episode):
-    os.makedirs(CHECKPOINTS_DIR, exist_ok=True)
-    agent.save(f"{CHECKPOINTS_DIR}/ddpg_agent_episode_{episode+1:04d}.pth")
+# save_checkpoint removed - SB3 handles checkpointing automatically via CheckpointCallback
 
 class CSVSaver:
     def __init__(self, filename):
@@ -138,127 +135,6 @@ def plot_td_histogram(td_errors, bins=50):
     save_file(plt, filename)
     plt.close()
 
-def save_q_surface(agent: DDPGAgent, env: DroneEnv, episode, resolution=50):
-    os.makedirs(Q_SURFACE_DIR, exist_ok=True)
-
-    critic = agent.critic
-    actor = agent.actor
-
-    obs_tensor = torch.tensor(env.get_current_obs(), dtype=torch.float32).unsqueeze(0)
-
-    dx = np.linspace(-1, 1, resolution)
-    dy = np.linspace(-1, 1, resolution)
-    values = np.zeros((resolution, resolution))
-
-    for i, x in enumerate(dx):
-        for j, y in enumerate(dy):
-            action = torch.tensor([[x, y]], dtype=torch.float32)
-            q_val = critic(obs_tensor, action).item()
-            values[j, i] = q_val
-
-    fig, axs = plt.subplots(2, 2, figsize=(18, 10))
-    ax1 = axs[0, 0]
-    ax2 = axs[0, 1]
-    ax3 = axs[1, 0]
-    ax4 = axs[1, 1]
-
-    # --- Q-функция в пространстве действий
-    im = ax1.imshow(values, extent=[-1, 1, -1, 1], origin='lower', cmap='viridis')
-    fig.colorbar(im, ax=ax1, label='Q value')
-    ax1.set_title("Q(s_fixed, a)")
-    ax1.set_xlabel("dx")
-    ax1.set_ylabel("dy")
-
-    # --- Мир (относительные координаты)
-    ax2.set_title("World space (centered on drone)")
-    ax2.set_aspect('equal')
-    ax2.grid(True)
-    ax2.plot(0, 0, 'bo', label="Drone")
-    ax3.plot(0, 0, 'bo', label="Drone")
-    ax4.plot(0, 0, 'bo', label="Drone")
-
-    max_dist = 1.0
-    if env.target_pos is not None:
-        relative_target = np.array(env.target_pos) - env.drone_pos
-        ax2.plot(relative_target[0], relative_target[1], 'ro', label="Target")
-        ax3.plot(relative_target[0], relative_target[1], 'ro', label="Target")
-        ax4.plot(relative_target[0], relative_target[1], 'ro', label="Target")
-        max_dist = max(max_dist, float(np.linalg.norm(relative_target)))
-
-    if env.obstacles:
-        for i, obs in enumerate(env.obstacles):
-            rel_obs = np.array(obs) - env.drone_pos
-            ax2.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
-            ax3.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
-            ax4.plot(rel_obs[0], rel_obs[1], 'kx', label="Obstacle" if i == 0 else None)
-            max_dist = max(max_dist, np.linalg.norm(rel_obs))
-
-    lim = max_dist * 1.2
-    ax2.set_xlim(-lim, lim)
-    ax2.set_ylim(-lim, lim)
-    ax2.legend()
-
-    # --- Фазовый портрет (в каждой точке мира: куда идти)
-    ax3.set_title("Phase portrait in world space")
-    ax3.set_aspect('equal')
-    ax3.set_xlabel("x")
-    ax3.set_ylabel("y")
-    ax3.grid(True)
-
-    # --- Фазовый портрет от актора
-    ax4.set_title("Actor Policy Field")
-    ax4.set_aspect('equal')
-    ax4.set_xlabel("x")
-    ax4.set_ylabel("y")
-    ax4.grid(True)
-
-    portrait_resolution = 24
-    world_grid = np.linspace(-lim, lim, portrait_resolution)
-    X, Y = np.meshgrid(world_grid, world_grid)
-    U_critic = np.zeros_like(X)
-    U_actor = np.zeros_like(X)
-    V_critic = np.zeros_like(Y)
-    V_actor = np.zeros_like(Y)
-
-    action_dx = np.linspace(-1, 1, 8)
-    action_dy = np.linspace(-1, 1, 8)
-
-    for i in range(portrait_resolution):
-        for j in range(portrait_resolution):
-            pos = np.array([X[i, j], Y[i, j]]) + env.drone_pos
-            tmp_env = DroneEnv()
-            tmp_env.set_positions(pos, env.target_pos, env.obstacles)
-            obs = tmp_env.get_current_obs()
-            obs_tensor_local = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
-
-            best_q = -float('inf')
-            best_a = (0.0, 0.0)
-
-            for dx_ in action_dx:
-                for dy_ in action_dy:
-                    a = torch.tensor([[dx_ , dy_]], dtype=torch.float32)
-                    q = critic(obs_tensor_local, a).item()
-                    if q > best_q:
-                        best_q = q
-                        best_a = (dx_, dy_)
-
-            with torch.no_grad():
-                action = actor(obs_tensor_local).squeeze().numpy()
-
-            U_critic[i, j], V_critic[i, j] = norm_vector(best_a)
-            U_actor[i, j], V_actor[i, j] = norm_vector(action)
-
-    ax3.quiver(X, Y, U_critic, V_critic, color='black', scale=20, alpha=0.6)
-    ax4.quiver(X, Y, U_actor, V_actor, color='darkgreen', scale=20, alpha=0.6)
-    ax4.set_xlim(-lim, lim)
-    ax4.set_ylim(-lim, lim)
-
-    # Сохраняем
-    plt.tight_layout()
-    filename = f"{Q_SURFACE_DIR}/q_surface_{episode+1:04d}"
-    save_file(plt, filename)
-    plt.close()
-
 def norm_vector(vector):
     norm = float(np.linalg.norm(vector))
     if norm > 1e-5:
@@ -267,7 +143,7 @@ def norm_vector(vector):
 
 
 
-def plot_episode_summary(episode, saver: EpisodeSaver):
+def plot_episode_summary(episode, saver: EpisodeSaverStatic):
     os.makedirs(PATHS_DIR, exist_ok=True)
 
     fig, (ax_map, ax_hist) = plt.subplots(2, 1, figsize=(10, 14), gridspec_kw={'height_ratios': [2, 1]})
@@ -305,7 +181,6 @@ def plot_episode_summary(episode, saver: EpisodeSaver):
     rel_poses = np.array(rel_poses)
     num_points = len(rel_poses)
     cmap_steps = cm.get_cmap('tab20', num_points)
-    print(episode+1, ':', num_points)
 
     for i in range(num_points):
         step_color = cmap_steps(i)
@@ -365,7 +240,7 @@ def plot_episode_summary(episode, saver: EpisodeSaver):
     ax.legend(handles=legend_elements, loc='upper right')
 
     plt.tight_layout()
-    filename = f"{PATHS_DIR}/path{episode+1:04d}"
+    filename = f"{PATHS_DIR}/path{episode:04d}"
     save_file(plt, filename)
     plt.close()
 

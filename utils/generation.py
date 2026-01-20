@@ -1,68 +1,200 @@
+from dataclasses import dataclass
 import numpy as np
-from typing import List, Tuple, Dict
+from scipy.stats import poisson, erlang, uniform
+from agents.drone import Drone
+from config.env_config import OBSTACLE_COLLISION_MAX_RADIUS
+from typing import List
+import numpy.typing as npt
 
-retp = False
-def generate_environment(field_size: float, num_obstacles: int) -> Dict[str, object]:
-    """Генерирует начальную конфигурацию среды: дрон и цель на фиксированном расстоянии (1/3 поля), препятствия."""
-    # print("generating environment")
-    global retp
 
-    # if retp != False:
-    #     return retp
+@dataclass
+class EnvData:
+    """Container class for environment data in a simulation scenario.
+    
+    Attributes:
+        drone: Current position of the drone as a NumPy array of float64 values.
+                        May be None if position is not changed.
+        target_position: Target position coordinates as a NumPy array of float64 values.
+                         May be None if target is not changed.
+        obstacles: List of obstacle positions, each represented by a NumPy array of float64 values.
+                   May be None if positions and count are not changed.
+    """
+    drone: Drone | None
+    target_position: npt.NDArray[np.float64] | None
+    obstacles: List[npt.NDArray[np.float64]] | None
 
-    # print("??")
-    fixed_distance = field_size / np.random.uniform(1.3, 3.1)
+class EnvGenerator:
+    def __init__(self, field_size, max_episodes, max_steps):
+        self.field_size: float = field_size
+        self.max_episodes: int = max_episodes
+        self.max_steps: int = max_steps
+        
+        self.episode: int = -1
+        self.step = -1
+        self.level = ''
+        # RNG is injected by the environment (Gymnasium) for reproducible generation.
+        self.rng: np.random.Generator = np.random.default_rng()
+        
+    def generate(self, current_env: EnvData) -> EnvData:
+        raise "Not implemented environment generator"
 
-    # Генерируем позицию дрона
-    drone_pos = np.random.uniform(0.0, field_size, size=2)
+    def set_rng(self, rng: np.random.Generator):
+        self.rng = rng
 
-    # Генерируем позицию цели на фиксированном расстоянии
-    for _ in range(100):  # максимум 100 попыток
-        theta = np.random.uniform(0.0, 2 * np.pi)
+    def set_state(self, episode: int, step: int, difficult_level: str = ''):
+        """
+        Method to set environment state parameters.
+
+        Args:
+            episode (int): Current episode number.
+            step (int): Current step within the episode.
+            difficult_level (str): Difficulty level for environment configuration.\
+            Set -1 for using default values.
+        """
+        self.episode = episode
+        self.level = difficult_level
+        self.step = step
+
+
+class EnvGeneratorDifferentEpisodes(EnvGenerator):
+    def __init__(self, field_size, max_episodes, max_steps):
+        super().__init__(field_size, max_episodes, max_steps)
+        
+        self.last_episode: int = -1
+        
+    def generate(self, current_env: EnvData) -> EnvData:
+        if self.episode == self.last_episode:
+            return EnvData(drone=None, target_position=None, obstacles=None)
+        self.last_episode = self.episode
+        
+        level = self.level
+        if len(level) == 0:
+            level = get_level_difficult(self.episode, self.max_episodes)
+        num_obstacles = generation_difficult_levels[level]['num_obstacles']
+        
+        fixed_distance = self.field_size / float(self.rng.uniform(1.3, 3.1))
+
+        drone_pos = self.rng.uniform(0.0, self.field_size, size=2)
+
+        for _ in range(100):
+            theta = float(self.rng.uniform(0.0, 2 * np.pi))
+            offset = np.array([np.cos(theta), np.sin(theta)]) * fixed_distance
+            target_pos = drone_pos + offset
+
+            if np.all(target_pos >= 0.0) and np.all(target_pos <= self.field_size):
+                break
+        else:
+            target_pos = np.clip(drone_pos + np.array([fixed_distance, 0]), 0.0, self.field_size)
+
+        max_obstacles_at_centered_path = 4
+
+        other_obstacles = num_obstacles - max_obstacles_at_centered_path
+        if other_obstacles < 0:
+            other_obstacles = 0
+        obstacles_at_centered_path = num_obstacles - other_obstacles
+        obstacles = [
+            self.rng.uniform(0.0, self.field_size, size=2)
+            for _ in range(other_obstacles)
+        ]
+
+        for _ in range(obstacles_at_centered_path):
+            alpha = float(self.rng.uniform(0.3, 0.7))
+            between_point = drone_pos + alpha * (target_pos - drone_pos)
+
+            noise = self.rng.normal(scale=0.03 * self.field_size, size=2)
+            between_obstacle = np.clip(between_point + noise, 0.0, self.field_size)
+
+            obstacles.append(between_obstacle)
+
+        return EnvData(
+            drone=Drone(pos=drone_pos),
+            target_position=target_pos,
+            obstacles=obstacles
+        )
+
+
+class EnvGeneratorDynamic(EnvGenerator):
+    def __init__(self, field_size, max_episodes, max_steps):
+        super().__init__(field_size, max_episodes, max_steps)
+        
+        mu = 1.3
+        self.dist_obstacle_count = poisson(mu)
+        self.dist_obstacle_angle = uniform(0, 2*np.pi)
+        self.dist_obstacle_distance = erlang(3.0, 0.9)
+        
+        self.last_episode = -1
+        
+    def generate(self, current_env: EnvData) -> EnvData:
+        change_all = self.last_episode != self.episode
+        self.last_episode = self.episode
+        
+        if change_all:
+            drone_pos = np.array([self.field_size/2, self.field_size/2])
+            drone = Drone(drone_pos)
+            target_pos = get_target_position(drone_pos, self.field_size, self.rng)
+        else:
+            drone = None
+            target_pos = None
+        
+        if drone is None:
+            # Use current_env.drone if available, otherwise skip obstacles
+            if current_env is not None and current_env.drone is not None:
+                obstacles = self.get_obstacles(current_env.drone)
+            else:
+                obstacles = None
+        else:
+            if self.step % 6 == 0:
+                obstacles = self.get_obstacles(drone)
+            else:
+                obstacles = None
+
+        return EnvData(
+            drone=drone,
+            target_position=target_pos,
+            obstacles=obstacles,
+        )
+    
+    def get_obstacle_count(self):
+        return int(self.dist_obstacle_count.rvs(random_state=self.rng))
+    
+    def get_obstacles(self, drone: Drone) -> List[np.ndarray]:
+        count = self.get_obstacle_count()
+        ret = []
+        
+        start_point = drone.position
+        min_shift_from_drone = OBSTACLE_COLLISION_MAX_RADIUS + 0.1
+        for _ in range(count):
+            angle = float(self.dist_obstacle_angle.rvs(random_state=self.rng)) + float(drone.orientation)
+            distance = float(self.dist_obstacle_distance.rvs(random_state=self.rng)) + float(min_shift_from_drone)
+            x_shift = distance * np.cos(angle)
+            y_shift = distance * np.sin(angle)
+            pos = np.array([start_point[0] + x_shift, start_point[1] + y_shift])
+            # Keep obstacles inside bounds to avoid far-away/invalid observations.
+            pos = np.clip(pos, 0.0, self.field_size)
+            ret.append(pos)
+        return ret
+            
+
+def get_target_position(drone_pos: npt.NDArray[np.float64], field_size: float, rng: np.random.Generator) -> np.ndarray:
+    fixed_distance = field_size / float(rng.uniform(1.3, 3.1))
+    for _ in range(100):
+        theta = float(rng.uniform(0.0, 2 * np.pi))
         offset = np.array([np.cos(theta), np.sin(theta)]) * fixed_distance
         target_pos = drone_pos + offset
 
         if np.all(target_pos >= 0.0) and np.all(target_pos <= field_size):
             break
     else:
-        # Если не нашли валидную позицию — зажмём в пределах
         target_pos = np.clip(drone_pos + np.array([fixed_distance, 0]), 0.0, field_size)
+        
+    return target_pos
 
-    # Генерируем препятствия
-    # Генерируем препятствия
 
-    max_obstacles_at_centered_path = 4
-
-    other_obstacles = num_obstacles - max_obstacles_at_centered_path
-    if other_obstacles < 0:
-        other_obstacles = 0
-    obstacles_at_centered_path = num_obstacles - other_obstacles
-    obstacles = [
-        tuple(np.random.uniform(0.0, field_size, size=2))
-        for _ in range(other_obstacles)
-    ]
-
-    # Добавляем хотя бы одно препятствие между дроном и целью
-    for _ in range(obstacles_at_centered_path):
-        alpha = np.random.uniform(0.3, 0.7)  # не строго по центру
-        between_point = drone_pos + alpha * (target_pos - drone_pos)
-
-        # Добавим небольшой шум, чтобы не быть строго на линии
-        noise = np.random.normal(scale=0.03 * field_size, size=2)
-        between_obstacle = tuple(np.clip(between_point + noise, 0.0, field_size))
-
-        obstacles.append(between_obstacle)
-
-    retp = {
-        "drone_pos": drone_pos,
-        "target_pos": target_pos,
-        "obstacles": obstacles
-    }
-    return {
-        "drone_pos": drone_pos,
-        "target_pos": target_pos,
-        "obstacles": obstacles
-    }
+def get_level_difficult(episode: int, max_episode: int):
+    level_difficult = 'easy'
+    if episode / max_episode >= 0.4 or episode > 300:
+        level_difficult = 'medium'
+    return level_difficult
 
 generation_difficult_levels = {
     'easy': {
@@ -79,5 +211,48 @@ generation_difficult_levels = {
     }
 }
 
-def generate_environment_categorial(field_size: float, level: str) -> Dict[str, object]:
-    return generate_environment(field_size, generation_difficult_levels[level]['num_obstacles'])
+
+def generate_environment_categorial(field_size: float, level: str):
+    """
+    Backward-compatible helper used by legacy notebooks/tests.
+
+    Returns a dict:
+      { "drone_pos": np.ndarray, "target_pos": np.ndarray, "obstacles": list[np.ndarray] }
+
+    Note: intentionally uses global `np.random` so callers can control randomness via `np.random.seed(...)`.
+    """
+    if level not in generation_difficult_levels:
+        raise ValueError(f"Unknown difficulty level: {level}")
+
+    num_obstacles = int(generation_difficult_levels[level]["num_obstacles"])
+
+    fixed_distance = field_size / np.random.uniform(1.3, 3.1)
+    drone_pos = np.random.uniform(0.0, field_size, size=2)
+
+    for _ in range(100):
+        theta = np.random.uniform(0.0, 2 * np.pi)
+        offset = np.array([np.cos(theta), np.sin(theta)]) * fixed_distance
+        target_pos = drone_pos + offset
+        if np.all(target_pos >= 0.0) and np.all(target_pos <= field_size):
+            break
+    else:
+        target_pos = np.clip(drone_pos + np.array([fixed_distance, 0.0]), 0.0, field_size)
+
+    max_obstacles_at_centered_path = 4
+    other_obstacles = max(0, num_obstacles - max_obstacles_at_centered_path)
+    obstacles_at_centered_path = num_obstacles - other_obstacles
+
+    obstacles = [np.random.uniform(0.0, field_size, size=2) for _ in range(other_obstacles)]
+
+    for _ in range(obstacles_at_centered_path):
+        alpha = np.random.uniform(0.3, 0.7)
+        between_point = drone_pos + alpha * (target_pos - drone_pos)
+        noise = np.random.normal(scale=0.03 * field_size, size=2)
+        between_obstacle = np.clip(between_point + noise, 0.0, field_size)
+        obstacles.append(between_obstacle)
+
+    return {
+        "drone_pos": drone_pos,
+        "target_pos": target_pos,
+        "obstacles": obstacles,
+    }

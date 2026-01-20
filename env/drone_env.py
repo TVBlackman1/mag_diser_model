@@ -8,7 +8,13 @@ from gymnasium import spaces
 from utils.barrier import get_obs_force_field, get_target_force_near_field
 from utils.checks import is_collision_in_movement, is_target_reached_in_movement
 from config.env_config import (
-    FIELD_SIZE, NUM_OBSTACLES, STEP_PENALTY_MULTIPLIER, DELTA_T, OBSTACLE_COLLISION_RADIUS, OBSTACLE_COLLISION_MAX_RADIUS
+    FIELD_SIZE,
+    NUM_OBSTACLES,
+    STEP_PENALTY_MULTIPLIER,
+    DELTA_T,
+    DISTANCE_REWARD_MULTIPLIER,
+    OBSTACLE_COLLISION_RADIUS,
+    OBSTACLE_COLLISION_MAX_RADIUS,
 )
 from config.drone_config import DRONE_COLLISION_RADIUS, DRONE_MAX_FORWARD_SPEED
 from config.train_config import MAX_STEPS_PER_EPISODE, NUM_EPISODES
@@ -41,6 +47,10 @@ class DroneEnv(gym.Env):
     
     def reset(self, *, seed=None, options=None) -> tuple[ObsType, dict[str, Any]]:
         super().reset(seed=seed)
+
+        # Ensure scenario generation is reproducible w.r.t. env seed.
+        if hasattr(self.env_generator, "set_rng"):
+            self.env_generator.set_rng(self.np_random)
         
         new_env_data = self.env_generator.generate(self.env_data)
         self._update_env_data(new_env_data)
@@ -48,9 +58,9 @@ class DroneEnv(gym.Env):
         self.last_distance_to_target = np.linalg.norm(
             self.env_data.drone.position - self.env_data.target_position
         )
-        if self.last_episode != self.env_generator.episode:
-            self.last_episode = self.env_generator.episode
-            self.step_number = 0
+        # In Gymnasium/SB3 semantics, reset() starts a new episode.
+        self.last_episode = self.env_generator.episode
+        self.step_number = 0
 
         return self._get_obs(), {}
 
@@ -61,8 +71,15 @@ class DroneEnv(gym.Env):
         obstacle_penalty = 0.0
         result = 'process'
 
-        action = action.detach().numpy()
-        speed_ratio, angle_ratio = action[0], action[1]
+        # Handle both torch tensors (old code) and numpy arrays (SB3)
+        if hasattr(action, 'detach'):
+            action = action.detach().cpu().numpy()
+        elif isinstance(action, np.ndarray):
+            action = np.array(action, dtype=np.float32)
+        else:
+            action = np.array(action, dtype=np.float32)
+        
+        speed_ratio, angle_ratio = float(action[0]), float(action[1])
 
         old_position = self.env_data.drone.position.copy()
         old_orientation = self.env_data.drone.orientation
@@ -79,17 +96,20 @@ class DroneEnv(gym.Env):
 
         reward = 0.0
         terminated = False
+        truncated = False
 
         last_distance = -1
         new_distance = -1
 
         if hit_obstacle:
-            reward = -10000
+            # Too-large terminal penalties make "do nothing" optimal.
+            # Keep it strong, but comparable to possible positive return in an episode.
+            reward = -300.0
             result = 'fail'
             terminated = True
 
         elif hit_target:
-            reward = 300
+            reward = 300.0
             result = 'success'
             terminated = True
 
@@ -97,11 +117,13 @@ class DroneEnv(gym.Env):
             old_distance_to_target = float(np.linalg.norm(old_position - self.env_data.target_position))
             distance_to_target = float(np.linalg.norm(position - self.env_data.target_position))
 
-            step_penalty += 3 / MAX_STEPS_PER_EPISODE
+            # Per-step penalty: discourages stalling but should not dominate learning signal.
+            step_penalty += float(STEP_PENALTY_MULTIPLIER) / float(MAX_STEPS_PER_EPISODE)
 
             progress = old_distance_to_target - distance_to_target
             normalized = progress / (DRONE_MAX_FORWARD_SPEED * self.delta_time)
-            target_reward += normalized**2  # линейно, 0..1
+            # Keep progress sign: moving away should be penalized.
+            target_reward += float(DISTANCE_REWARD_MULTIPLIER) * float(np.clip(normalized, -1.0, 1.0))
 
             # if old_distance_to_target - distance_to_target < DRONE_MAX_FORWARD_SPEED * self.delta_time * 0.10:
             #     step_penalty += 1
@@ -114,8 +136,13 @@ class DroneEnv(gym.Env):
             last_distance = old_distance_to_target
             new_distance = distance_to_target
 
+        # Time limit: truncate episode if max steps reached (SB3 expects truncated flag).
+        if not terminated and self.step_number >= MAX_STEPS_PER_EPISODE:
+            truncated = True
+            result = 'timeout'
+
         obs = self._get_obs()
-        return obs, reward, terminated, False, {
+        return obs, reward, terminated, truncated, {
             'target_reward': target_reward,
             'step_penalty': step_penalty,
             'obstacle_penalty': obstacle_penalty,

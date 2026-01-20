@@ -7,7 +7,6 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 from matplotlib.patches import Patch
 
-from agents.ddpg_agent import DDPGAgent
 from config.version import EXPERIMENT_FOLDER, EXPERIMENT_NOTES
 from env.drone_env import DroneEnv
 from utils.episode_saver import EpisodeSaverStatic
@@ -25,9 +24,7 @@ def create_save_dir():
     with open(f'{EXPERIMENT_FOLDER}/description.txt', 'w', newline='') as file:
         file.write(EXPERIMENT_NOTES)
 
-def save_checkpoint(agent, episode):
-    os.makedirs(CHECKPOINTS_DIR, exist_ok=True)
-    agent.save(f"{CHECKPOINTS_DIR}/ddpg_agent_episode_{episode+1:04d}.pth")
+# save_checkpoint removed - SB3 handles checkpointing automatically via CheckpointCallback
 
 class CSVSaver:
     def __init__(self, filename):

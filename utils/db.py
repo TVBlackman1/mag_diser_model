@@ -35,6 +35,9 @@ class DBSaver:
                   angle_ratio,
                   target_distance, new_target_distance, reward, result
                   ):
+        # Kept for backward compatibility: accept vector positions.
+        x, y = float(old_drone_pos[0]), float(old_drone_pos[1])
+        new_x, new_y = float(new_drone_pos[0]), float(new_drone_pos[1])
         self.con.execute("INSERT INTO experiments VALUES (nextval('seq_experiment_id'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
             self.episode, step, float(x), float(y), float(new_x), float(new_y), float(speed_ratio),
             float(angle_ratio),

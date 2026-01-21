@@ -21,10 +21,11 @@ from config.train_config import MAX_STEPS_PER_EPISODE, NUM_EPISODES
 from agents.drone import Drone
 from utils.generation import EnvData, EnvGenerator
 from utils.drone_view import AffineTransform2D
+from utils.target_strategies import TargetStrategy
 
 
 class DroneEnv(gym.Env):
-    def __init__(self, generator: EnvGenerator):
+    def __init__(self, generator: EnvGenerator, target_strategy: TargetStrategy | None = None):
         super(DroneEnv, self).__init__()
 
         self.field_size = FIELD_SIZE
@@ -34,6 +35,7 @@ class DroneEnv(gym.Env):
         self.step_number = 0
         self.delta_time = DELTA_T
         self.env_generator: EnvGenerator = generator
+        self.target_strategy: TargetStrategy | None = target_strategy
         self.env_data: EnvData | None = None
 
         self.action_space = action_space()
@@ -54,6 +56,17 @@ class DroneEnv(gym.Env):
         
         new_env_data = self.env_generator.generate(self.env_data)
         self._update_env_data(new_env_data)
+
+        # Ensure target starts in a valid position for moving-target scenarios.
+        if self.target_strategy is not None and self.env_data.target_position is not None:
+            self.env_data.target_position = self.target_strategy.ensure_valid_position(
+                self.env_data.target_position.copy(),
+                self.env_data.obstacles or [],
+                # Strategy instances already carry min_distance; reuse a conservative default via obstacles' radius.
+                # Tests for target strategies pass an explicit min distance into ensure_valid_position directly.
+                # Here we rely on the strategy implementation to keep it safe in update().
+                getattr(self.target_strategy, "min_distance_to_obstacle", OBSTACLE_COLLISION_MAX_RADIUS + 0.5),
+            )
 
         self.last_distance_to_target = np.linalg.norm(
             self.env_data.drone.position - self.env_data.target_position
@@ -80,6 +93,15 @@ class DroneEnv(gym.Env):
             action = np.array(action, dtype=np.float32)
         
         speed_ratio, angle_ratio = float(action[0]), float(action[1])
+
+        # Move target first (based on current env state) if strategy is enabled.
+        # This avoids "catching" a target that would have moved away in the same step.
+        if self.target_strategy is not None and self.env_data.target_position is not None:
+            self.env_data.target_position = self.target_strategy.update(
+                self.env_data.target_position.copy(),
+                self.env_data,
+                self.delta_time,
+            )
 
         old_position = self.env_data.drone.position.copy()
         old_orientation = self.env_data.drone.orientation

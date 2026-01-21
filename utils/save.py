@@ -19,10 +19,17 @@ Q_SURFACE_DIR = f"{EXPERIMENT_FOLDER}/{Q_SURFACE_SUBDIR}"
 PATHS_DIR = f"{EXPERIMENT_FOLDER}/{PATHS_SUBDIR}"
 LOG_BUFFER_LIMIT = 15
 
-def create_save_dir():
-    os.makedirs(EXPERIMENT_FOLDER, exist_ok=True)
-    with open(f'{EXPERIMENT_FOLDER}/description.txt', 'w', newline='') as file:
-        file.write(EXPERIMENT_NOTES)
+def create_save_dir(base_folder: str = EXPERIMENT_FOLDER, notes: str = EXPERIMENT_NOTES):
+    """
+    Create an experiment output folder and write a description file.
+
+    Args:
+        base_folder: Output folder path.
+        notes: Text written to `description.txt`.
+    """
+    os.makedirs(base_folder, exist_ok=True)
+    with open(f"{base_folder}/description.txt", "w", newline="") as file:
+        file.write(notes)
 
 # save_checkpoint removed - SB3 handles checkpointing automatically via CheckpointCallback
 

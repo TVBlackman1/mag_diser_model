@@ -1,0 +1,32 @@
+{
+  "json.validate.enable": true,
+  "json.schemaDownload.enable": false,
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/node_modules/**": true,
+    "**/.venv/**": true,
+    "**/checkpoints/**": true,
+    "**/best_model/**": true,
+    "**/inference_runs/**": true,
+    "**/__pycache__/**": true,
+    "**/results/**": true,
+    "**/results_resolved/**": true,
+    "**/tensorboard_logs/**": true,
+    "**/eval_logs/**": true,
+    "**/logs/**": true
+  },
+  "search.exclude": {
+    "**/.git/**": true,
+    "**/node_modules/**": true,
+    "**/.venv/**": true,
+    "**/checkpoints/**": true,
+    "**/best_model/**": true,
+    "**/inference_runs/**": true,
+    "**/__pycache__/**": true,
+    "**/results/**": true,
+    "**/results_resolved/**": true,
+    "**/tensorboard_logs/**": true,
+    "**/eval_logs/**": true,
+    "**/notebooks/.ipynb_checkpoints/**": true
+  },
+}

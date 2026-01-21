@@ -8,7 +8,7 @@ def is_target_reached(drone_pos, target_pos):
 
 def is_target_reached_in_movement(drone_pos, drone_pos2, target_pos):
     return circle_segment_intersect(
-            target_pos[0], target_pos[1], OBSTACLE_COLLISION_MAX_RADIUS,
+            target_pos[0], target_pos[1], TARGET_COLLISION_MAX_RADIUS,
             drone_pos[0], drone_pos[1], drone_pos2[0], drone_pos2[1])
 
 def is_collision(drone_pos, obstacles):

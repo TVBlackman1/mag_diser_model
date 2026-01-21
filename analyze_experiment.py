@@ -62,8 +62,22 @@ def _resolve_paths(path: str | None, latest: bool) -> ExperimentPaths:
 
 
 def _load_episode_summary(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    # Final result of an episode is the result at the maximum step.
-    # NOTE: assumes `step` increases within an episode (true in wrapper).
+    """
+    Build a per-episode summary from step-level rows in DuckDB.
+
+    Expects a table named `experiments` (see `utils/db/migration.sql`) with one row per env step.
+
+    Returns a DataFrame with one row per episode:
+    - `episode`: episode index
+    - `is_train`: whether the episode was logged as training or evaluation
+    - `last_step`: last step index observed for the episode
+    - `episode_return`: sum(reward) over the episode
+    - `episode_len`: last_step + 1 (assuming step starts at 0 and increases by 1)
+    - `min_target_distance`: min(new_target_distance) seen during the episode
+    - `final_result`: the `result` at the maximum step (e.g. success/fail/timeout)
+
+    Assumption: `step` is monotonically increasing within an episode.
+    """
     query = """
     WITH per_ep AS (
       SELECT

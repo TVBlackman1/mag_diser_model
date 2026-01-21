@@ -2,7 +2,14 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.stats import poisson, erlang, uniform
 from agents.drone import Drone
-from config.env_config import OBSTACLE_COLLISION_MAX_RADIUS
+from config.env_config import (
+    OBSTACLE_COLLISION_MAX_RADIUS,
+    OBSTACLE_MEDIUM_START_FRAC,
+    OBSTACLE_HARD_START_FRAC,
+    DYNAMIC_OBSTACLE_MU_EASY,
+    DYNAMIC_OBSTACLE_MU_MEDIUM,
+    DYNAMIC_OBSTACLE_MU_HARD,
+)
 from typing import List
 import numpy.typing as npt
 
@@ -117,18 +124,31 @@ class EnvGeneratorDynamic(EnvGenerator):
     def __init__(self, field_size, max_episodes, max_steps):
         super().__init__(field_size, max_episodes, max_steps)
         
-        mu = 1.3
-        self.dist_obstacle_count = poisson(mu)
+        self.dist_obstacle_count = poisson(DYNAMIC_OBSTACLE_MU_EASY)
         self.dist_obstacle_angle = uniform(0, 2*np.pi)
         self.dist_obstacle_distance = erlang(3.0, 0.9)
         
         self.last_episode = -1
+
+    def _apply_level(self, level: str):
+        """Update internal obstacle distributions based on difficulty level."""
+        if level == "hard":
+            mu = DYNAMIC_OBSTACLE_MU_HARD
+        elif level == "medium":
+            mu = DYNAMIC_OBSTACLE_MU_MEDIUM
+        else:
+            mu = DYNAMIC_OBSTACLE_MU_EASY
+        self.dist_obstacle_count = poisson(mu)
         
     def generate(self, current_env: EnvData) -> EnvData:
         change_all = self.last_episode != self.episode
         self.last_episode = self.episode
         
         if change_all:
+            # Adjust difficulty schedule for dynamic obstacles
+            level = self.level or get_level_difficult(self.episode, self.max_episodes)
+            self._apply_level(level)
+
             drone_pos = np.array([self.field_size/2, self.field_size/2])
             drone = Drone(drone_pos)
             target_pos = get_target_position(drone_pos, self.field_size, self.rng)
@@ -191,10 +211,14 @@ def get_target_position(drone_pos: npt.NDArray[np.float64], field_size: float, r
 
 
 def get_level_difficult(episode: int, max_episode: int):
-    level_difficult = 'easy'
-    if episode / max_episode >= 0.4 or episode > 300:
-        level_difficult = 'medium'
-    return level_difficult
+    if max_episode <= 0:
+        return "easy"
+    frac = float(episode) / float(max_episode)
+    if frac >= OBSTACLE_HARD_START_FRAC:
+        return "hard"
+    if frac >= OBSTACLE_MEDIUM_START_FRAC:
+        return "medium"
+    return "easy"
 
 generation_difficult_levels = {
     'easy': {
@@ -202,6 +226,9 @@ generation_difficult_levels = {
     },
     'medium': {
         'num_obstacles': 12,
+    },
+    'hard': {
+        'num_obstacles': 24,
     },
     'warmup': {
         'num_obstacles': 4,

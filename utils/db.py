@@ -3,8 +3,10 @@ from pathlib import Path
 from config.version import EXPERIMENT_FOLDER
 
 class DBSaver:
-    def __init__(self):
-        file = f"{EXPERIMENT_FOLDER}/data.db"
+    def __init__(self, base_folder: str | Path = EXPERIMENT_FOLDER):
+        base_folder = Path(base_folder)
+        base_folder.mkdir(parents=True, exist_ok=True)
+        file = str(base_folder / "data.db")
         self.con = duckdb.connect(file)
         self.episode = 0
         self.is_train = True
